@@ -1,0 +1,178 @@
+{
+  "video_id": "hackthe6ix",
+  "video_title": "Hackathon Event Highlights",
+  "video_description": "Highlights of a hackathon event showcasing various activities and presentations.",
+  "video_length": 141,
+  "overall_mood": "energetic",
+  "segments": [
+    {
+      "start_time": 0,
+      "end_time": 7,
+      "sentiment": "exciting",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 11,
+      "end_time": 14,
+      "sentiment": "calm",
+      "music_style": "Pop",
+      "intensity": "low",
+      "include": true
+    },
+    {
+      "start_time": 14,
+      "end_time": 18,
+      "sentiment": "happy",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 21,
+      "end_time": 24,
+      "sentiment": "energetic",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 34,
+      "end_time": 37,
+      "sentiment": "dramatic",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 40,
+      "end_time": 43,
+      "sentiment": "calm",
+      "music_style": "Pop",
+      "intensity": "low",
+      "include": true
+    },
+    {
+      "start_time": 51,
+      "end_time": 54,
+      "sentiment": "suspenseful",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 60,
+      "end_time": 63,
+      "sentiment": "happy",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 68,
+      "end_time": 71,
+      "sentiment": "exciting",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 75,
+      "end_time": 78,
+      "sentiment": "calm",
+      "music_style": "Pop",
+      "intensity": "low",
+      "include": true
+    },
+    {
+      "start_time": 87,
+      "end_time": 90,
+      "sentiment": "happy",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 95,
+      "end_time": 98,
+      "sentiment": "dramatic",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 105,
+      "end_time": 108,
+      "sentiment": "suspenseful",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 111,
+      "end_time": 114,
+      "sentiment": "happy",
+      "music_style": "Pop",
+      "intensity": "low",
+      "include": true
+    },
+    {
+      "start_time": 120,
+      "end_time": 123,
+      "sentiment": "exciting",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 127,
+      "end_time": 130,
+      "sentiment": "calm",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 133,
+      "end_time": 136,
+      "sentiment": "happy",
+      "music_style": "Pop",
+      "intensity": "low",
+      "include": true
+    },
+    {
+      "start_time": 136,
+      "end_time": 139,
+      "sentiment": "suspenseful",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    }
+  ],
+  "music": {
+    "tracks": [
+      {
+        "start": 0,
+        "end": 27,
+        "style": "Pop",
+        "intensity": "high",
+        "sentiment": "exciting"
+      },
+      {
+        "start": 27,
+        "end": 63,
+        "style": "Pop",
+        "intensity": "medium",
+        "sentiment": "happy"
+      },
+      {
+        "start": 63,
+        "end": 90,
+        "style": "Pop",
+        "intensity": "low",
+        "sentiment": "calm"
+      }
+    ]
+  }
+}

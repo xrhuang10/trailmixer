@@ -142,7 +142,7 @@ Use the following structure for the `"music"` object:
 **Constraints for Music Tracks:**
 - The number of tracks must be exactly {num_tracks}.
 - The total duration of all tracks combined must equal the total duration of `"include": true` segments.
-- This duration must NOT exceed the lesser of the video length and {desired_length} seconds.
+- This duration must NOT exceed the lesser of the video length and the user's desired length of {desired_length} seconds.
 - Track time ranges must not overlap.
 - All timestamps must be numeric values in seconds.
 - Each track must use a **unique combination** of `style` and `sentiment`.
@@ -151,11 +151,11 @@ Use the following structure for the `"music"` object:
 ---
 
 **General Rules:**
-- The combined duration of all `"include": true` segments must not exceed the lesser of {desired_length} and the total video length.
+- The combined duration of all `"include": true` segments must not exceed the lesser of {desired_length} and the total video length. The sum of all the durations (end_time - start_time) of all the segments will therefore be around {desired_length} seconds.
 - Segments must not overlap or leave gaps between included portions.
 - Use only the most emotionally or narratively meaningful scenes.
 - All timestamps must be in numeric seconds (e.g., 14.5 — not "00:14").
-- Only use the full video if its total length is less than {desired_length}.
+- Only use the full video if its total length is less than the user's desired length of {desired_length} seconds.
 
 **Also return:**
 - Full original video length (`video_length`)
@@ -163,9 +163,13 @@ Use the following structure for the `"music"` object:
 - Overall mood/sentiment of the full video
 
 **IMPORTANT:**
-- Only segments marked `"include": true` are retained and used for music generation.
+- Only segments marked `"include": true` are retained and used for music generation. Therefore, the sum of all the durations (end_time - start_time) of all the segments will be around the user's desired length of {desired_length} seconds.
 - Music must reflect the dominant mood and pacing of selected segments.
 - Each music track must have a **distinct combination** of style and sentiment.
+- Your #1 priority is to create a list of segments whose total sum of durations (end_time - start_time) equals the user's desired length of {desired_length} seconds, even if that means incorporating less meaningful segments. The sum of all the music track durations will also be around the user's desired length of {desired_length} seconds.
 - No commentary or explanation — return ONLY the final JSON using this exact format:
-{twelvelabs_output_schema}
+
+{json.dumps(twelvelabs_output_schema, indent=4)}
+
+Now take a deep breath and start analyzing the video.
 """
