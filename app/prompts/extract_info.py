@@ -40,11 +40,11 @@ twelvelabs_output_schema = {
                 },
                 "sentiment": {
                     "type": "string",
-                    "description": "The sentiment/mood of this segment (e.g., positive, negative, neutral, exciting, tense, peaceful)"
+                    "description": "One of: 'happy', 'sad', 'energetic', 'calm', 'dramatic', 'romantic', 'suspenseful'"
                 },
                 "music_style": {
                     "type": "string",
-                    "description": "Recommended music style/genre for this segment (e.g., upbeat, ambient, cinematic, acoustic, electronic)"
+                    "description": "One of: 'Classical', 'Hip Hop', 'Pop', 'Electronic', 'Meme'"
                 },
                 "intensity": {
                     "type": "string",
@@ -108,7 +108,7 @@ Use the following structure for the `"music"` object:
             "end": total_duration_of_included_segments (must be the lesser of {desired_length} and video length),
             "style": "{music_style}",
             "intensity": "<analyzed intensity>",
-            "sentiment": "<one word from: {', '.join(sentiment_list)}>"
+            "sentiment": "<one word from: "happy", "sad", "energetic", "calm", "dramatic", "romantic", "suspenseful">"
         }}
     ]
 }}''' if num_tracks == 1 else f'''Multiple tracks format (if num_tracks > 1):
@@ -167,5 +167,5 @@ Use the following structure for the `"music"` object:
 - Music must reflect the dominant mood and pacing of selected segments.
 - Each music track must have a **distinct combination** of style and sentiment.
 - No commentary or explanation — return ONLY the final JSON using this exact format:
-{json.dumps(twelvelabs_output_schema, indent=4)}
+{twelvelabs_output_schema}
 """
