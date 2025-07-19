@@ -6,12 +6,13 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 # Import helper functions (to be implemented)
-from app.twelvelabs_client import upload_video_to_twelvelabs, prompt_twelvelabs
+from twelvelabs_client import upload_video_to_twelvelabs, prompt_twelvelabs
+from prompts.extract_info import extract_info_prompt
 
 app = FastAPI(title="TrailMixer Video Processing API")
 
 # Serve static files for processed videos
-app.mount("/static", StaticFiles(directory="processed_videos"), name="static")
+app.mount("/static", StaticFiles(directory="../processed_videos"), name="static")
 
 # In-memory storage for job status (in production, use Redis or database)
 job_status: Dict[str, Dict] = {}
@@ -35,14 +36,13 @@ def process_video_with_sentiment(file_path: str, sentiment_data: dict, output_pa
 
 def analyze_sentiment_with_twelvelabs(video_id: str) -> dict:
     """Helper function to analyze sentiment using Twelve Labs"""
-    prompt = "Analyze the sentiment and emotional tone of this video. Provide a detailed breakdown of emotions expressed, including timestamps of key emotional moments."
-    result = prompt_twelvelabs(video_id, prompt)
+    result = prompt_twelvelabs(video_id, extract_info_prompt)
     return {"sentiment_analysis": result.data if result else "Analysis failed"}
 
 def process_video_segments(file_path: str, sentiment_data: dict, job_id: str) -> dict:
     """Helper function to process video with FFmpeg based on sentiment"""
     # This would call your FFmpeg processing logic
-    output_path = f"processed_videos/{job_id}_processed.mp4"
+    output_path = f'../processed_videos/{job_id}_processed.mp4'
     timestamps = extract_timestamps(sentiment_data)
     process_video_with_sentiment(file_path, sentiment_data, output_path)
     return {
@@ -340,3 +340,7 @@ def delete_job(job_id: str):
 @app.get('/health')
 def health_check():
     return {"status": "healthy", "service": "TrailMixer Video Processing API"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -84,7 +84,7 @@ def prompt_twelvelabs(video_id: str, prompt: str) -> Optional[GenerateOpenEndedT
             video_id=video_id,
             prompt=prompt
         )
-        print(f"Prompting ended")
+        print(f"Prompting complete!")
         return response
     except Exception as e:
         print(f"Error prompting Twelve Labs: {str(e)}")
@@ -118,7 +118,7 @@ def clean_llm_string_output_to_json(string: str) -> Dict[str, Any]:
     # Parse the cleaned JSON
     return json.loads(cleaned)
 
-def export_to_json_file(cleaned_data: Dict[str, Any], filename: str = "twelvelabs_analysis.json") -> str:
+def export_to_json_file(cleaned_data: Dict[str, Any], filename: str) -> str:
     """
     Export the cleaned data to a JSON file.
     
@@ -129,14 +129,6 @@ def export_to_json_file(cleaned_data: Dict[str, Any], filename: str = "twelvelab
     Returns:
         The path to the exported JSON file
     """
-    
-    
-    # Generate filename if not provided
-    if filename is None:
-        video_id = cleaned_data.get('video_id', 'unknown')
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"twelvelabs_analysis_{video_id}_{timestamp}.json"
-    
     # Ensure filename has .json extension
     if not filename.endswith('.json'):
         filename += '.json'
@@ -162,7 +154,7 @@ def export_to_json_file(cleaned_data: Dict[str, Any], filename: str = "twelvelab
 # For testing
 if __name__ == "__main__":
     # upload_video_to_twelvelabs("..\\files\\speed.mp4")
-    response = prompt_twelvelabs("687b0d7d61acc75954400474", extract_info_prompt)
+    response = prompt_twelvelabs("687b0e4861acc759544004a1", extract_info_prompt)
     if response:
         # Get cleaned data
         
@@ -170,6 +162,9 @@ if __name__ == "__main__":
         print(f"Cleaned JSON: {cleaned_json}")
         video_title = cleaned_json["video_title"]
         
-        exported_file = export_to_json_file(cleaned_json, f"{video_title}.json")
+        # Use timestamp_video_id format instead of video title to avoid special characters
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        video_id = "687b0e4861acc759544004a1"  # Use actual video_id from the test
+        exported_file = export_to_json_file(cleaned_json, f"{timestamp}_{video_id}.json")
         if exported_file:
             print(f"📁 File saved to: {exported_file}")

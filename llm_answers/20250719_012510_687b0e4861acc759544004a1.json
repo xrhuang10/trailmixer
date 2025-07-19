@@ -1,0 +1,25 @@
+{
+  "video_id": "1234567890",
+  "video_title": "A Young Man's Story",
+  "video_description": "A young man shares his experiences and thoughts.",
+  "video_length": 31,
+  "overall_mood": "Reflective",
+  "timestamps": [
+    {
+      "start_timestamp": "0s (00:00)",
+      "end_timestamp": "15s (00:15)",
+      "sentiment": "Neutral",
+      "song_name": "Somewhere Over the Rainbow",
+      "song_start_timestamp": "0s (00:00)",
+      "song_end_timestamp": "15s (00:15)"
+    },
+    {
+      "start_timestamp": "15s (00:15)",
+      "end_timestamp": "31s (00:31)",
+      "sentiment": "Positive",
+      "song_name": "Happy Birthday to You",
+      "song_start_timestamp": "15s (00:15)",
+      "song_end_timestamp": "31s (00:31)"
+    }
+  ]
+}
