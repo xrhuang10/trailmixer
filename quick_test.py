@@ -4,16 +4,30 @@ Quick test script for TrailMixer FFmpeg pipeline
 
 This script provides a simple way to test the basic functionality
 without running the full test suite.
+
+Usage:
+    python quick_test.py                      # Run with generated test files
+    python quick_test.py --audio input.mp3    # Test with custom audio file
+    python quick_test.py --video input.mp4    # Test with custom video file
+    python quick_test.py --audio in.mp3 --video in.mp4  # Test with both
 """
 
 import os
 import sys
 import tempfile
 import subprocess
+import argparse
 from pathlib import Path
 
 # Add the app directory to the path
 sys.path.append(str(Path(__file__).parent / "app"))
+
+def parse_args():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(description="Test TrailMixer FFmpeg pipeline")
+    parser.add_argument('--audio', type=str, help='Path to input audio file')
+    parser.add_argument('--video', type=str, help='Path to input video file')
+    return parser.parse_args()
 
 def check_ffmpeg():
     """Check if FFmpeg is installed"""
@@ -29,15 +43,15 @@ def check_ffmpeg():
         return False
 
 def create_test_files(test_dir):
-    """Create simple test files"""
+    """Create simple test files if no input files provided"""
     print(f"📁 Creating test files in: {test_dir}")
     
     # Create a simple audio file (1 second of silence)
-    audio_path = test_dir / "test_audio.wav"
+    audio_path = test_dir / "test_audio.mp3"
     try:
         cmd = [
             'ffmpeg', '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
-            '-t', '1', '-c:a', 'pcm_s16le', str(audio_path), '-y', '-loglevel', 'error'
+            '-t', '1', '-c:a', 'libmp3lame', '-b:a', '128k', str(audio_path), '-y', '-loglevel', 'error'
         ]
         subprocess.run(cmd, check=True, capture_output=True)
         print(f"✅ Created test audio: {audio_path}")
@@ -64,13 +78,40 @@ def create_test_files(test_dir):
         'video': str(video_path)
     }
 
+def setup_test_files(args, temp_dir):
+    """Set up test files based on command line args or create new ones"""
+    test_files = {}
+    
+    if args.audio:
+        audio_path = Path(args.audio)
+        if not audio_path.exists():
+            print(f"⚠️  Audio file not found: {audio_path}")
+        else:
+            test_files['audio'] = str(audio_path)
+            print(f"✅ Using audio file: {audio_path}")
+            
+    if args.video:
+        video_path = Path(args.video)
+        if not video_path.exists():
+            print(f"⚠️  Video file not found: {video_path}")
+        else:
+            test_files['video'] = str(video_path)
+            print(f"✅ Using video file: {video_path}")
+            
+    # If no valid files provided, create test files
+    if not test_files:
+        print("ℹ️  No input files provided, creating test files...")
+        test_files = create_test_files(temp_dir)
+        
+    return test_files
+
 def test_imports():
     """Test if we can import the required modules"""
     print("\n🔍 Testing imports...")
     
     try:
-        from ffmpeg import stitch_ffmpeg_request
-        from models import FfmpegRequest, InputSegment, AudioCodec, VideoCodec
+        from app.ffmpeg import stitch_ffmpeg_request
+        from app.models import FfmpegRequest, InputSegment, AudioCodec, VideoCodec
         print("✅ All imports successful")
         return True
     except ImportError as e:
@@ -86,10 +127,10 @@ def test_audio_processing(test_files):
         return False
     
     try:
-        from ffmpeg import stitch_ffmpeg_request
-        from models import FfmpegRequest, InputSegment, AudioCodec
+        from app.ffmpeg import stitch_ffmpeg_request
+        from app.models import FfmpegRequest, InputSegment, AudioCodec, VideoCodec
         
-        output_path = Path(test_files['audio']).parent / "output_audio.wav"
+        output_path = Path(test_files['audio']).parent / "output_audio.mp3"
         
         request = FfmpegRequest(
             input_segments=[
@@ -98,12 +139,32 @@ def test_audio_processing(test_files):
                     file_type='audio',
                     start_time="00:00:00",
                     end_time="00:00:01",  # 1 second
-                    volume=0.5
+                    volume=0.5,
+                    fade_in=None,
+                    fade_out=None,
+                    metadata=None
                 )
             ],
             output_file=str(output_path),
-            audio_codec=AudioCodec.WAV,
-            quiet=True
+            audio_codec=AudioCodec.MP3,
+            audio_bitrate="128k",  # Added bitrate for MP3
+            quiet=False,  # Keep FFmpeg output visible
+            video_codec=VideoCodec.H264,  # This won't be used for audio-only
+            video_bitrate=None,
+            crf=None,
+            preset="medium",
+            scale=None,
+            fps=None,
+            audio_channels=2,
+            audio_sample_rate=44100,
+            global_volume=1.0,
+            normalize_audio=False,
+            crossfade_duration=None,
+            gap_duration="00:00:00",
+            overwrite=True,
+            progress=True,
+            request_id=None,
+            priority=1
         )
         
         result = stitch_ffmpeg_request(request)
@@ -111,7 +172,7 @@ def test_audio_processing(test_files):
         return True
         
     except Exception as e:
-        print(f"❌ Audio processing failed: {e}")
+        print(f"❌ Audio processing failed:\n{str(e)}")
         return False
 
 def test_video_processing(test_files):
@@ -123,8 +184,8 @@ def test_video_processing(test_files):
         return False
     
     try:
-        from ffmpeg import stitch_ffmpeg_request
-        from models import FfmpegRequest, InputSegment, VideoCodec
+        from app.ffmpeg import stitch_ffmpeg_request
+        from app.models import FfmpegRequest, InputSegment, VideoCodec, AudioCodec
         
         output_path = Path(test_files['video']).parent / "output_video.mp4"
         
@@ -136,12 +197,31 @@ def test_video_processing(test_files):
                     start_time="00:00:00",
                     end_time="00:00:01",  # 1 second
                     fade_in="0.1",
-                    fade_out="0.1"
+                    fade_out="0.1",
+                    volume=1.0,
+                    metadata=None
                 )
             ],
             output_file=str(output_path),
             video_codec=VideoCodec.H264,
-            quiet=True
+            quiet=False,  # Changed to see FFmpeg output
+            audio_codec=AudioCodec.AAC,  # This won't be used for video-only
+            video_bitrate=None,
+            audio_bitrate=None,
+            crf=None,
+            preset="medium",
+            scale=None,
+            fps=None,
+            audio_channels=2,
+            audio_sample_rate=44100,
+            global_volume=1.0,
+            normalize_audio=False,
+            crossfade_duration=None,
+            gap_duration="00:00:00",
+            overwrite=True,
+            progress=True,
+            request_id=None,
+            priority=1
         )
         
         result = stitch_ffmpeg_request(request)
@@ -149,7 +229,7 @@ def test_video_processing(test_files):
         return True
         
     except Exception as e:
-        print(f"❌ Video processing failed: {e}")
+        print(f"❌ Video processing failed:\n{str(e)}")
         return False
 
 def test_combined_processing(test_files):
@@ -161,8 +241,8 @@ def test_combined_processing(test_files):
         return False
     
     try:
-        from ffmpeg import stitch_ffmpeg_request
-        from models import FfmpegRequest, InputSegment, VideoCodec, AudioCodec
+        from app.ffmpeg import stitch_ffmpeg_request
+        from app.models import FfmpegRequest, InputSegment, VideoCodec, AudioCodec
         
         output_path = Path(test_files['video']).parent / "output_combined.mp4"
         
@@ -172,19 +252,43 @@ def test_combined_processing(test_files):
                     file_path=test_files['video'],
                     file_type='video',
                     start_time="00:00:00",
-                    end_time="00:00:01"  # 1 second
+                    end_time="00:00:01",  # 1 second
+                    volume=1.0,
+                    fade_in=None,
+                    fade_out=None,
+                    metadata=None
                 ),
                 InputSegment(
                     file_path=test_files['audio'],
                     file_type='audio',
                     start_time="00:00:00",
-                    end_time="00:00:01"  # 1 second
+                    end_time="00:00:01",  # 1 second
+                    volume=1.0,
+                    fade_in=None,
+                    fade_out=None,
+                    metadata=None
                 )
             ],
             output_file=str(output_path),
             video_codec=VideoCodec.H264,
             audio_codec=AudioCodec.AAC,
-            quiet=True
+            quiet=True,
+            video_bitrate=None,
+            audio_bitrate=None,
+            crf=None,
+            preset="medium",
+            scale=None,
+            fps=None,
+            audio_channels=2,
+            audio_sample_rate=44100,
+            global_volume=1.0,
+            normalize_audio=False,
+            crossfade_duration=None,
+            gap_duration="00:00:00",
+            overwrite=True,
+            progress=True,
+            request_id=None,
+            priority=1
         )
         
         result = stitch_ffmpeg_request(request)
@@ -200,6 +304,9 @@ def main():
     print("🚀 TrailMixer Quick Test")
     print("=" * 40)
     
+    # Parse command line arguments
+    args = parse_args()
+    
     # Check FFmpeg installation
     if not check_ffmpeg():
         return
@@ -208,22 +315,27 @@ def main():
     if not test_imports():
         return
     
-    # Create temporary directory for test files
+    # Create temporary directory for test files and outputs
     with tempfile.TemporaryDirectory(prefix="trailmixer_quick_") as temp_dir:
         test_dir = Path(temp_dir)
         
-        # Create test files
-        test_files = create_test_files(test_dir)
+        # Set up test files (from args or create new ones)
+        test_files = setup_test_files(args, test_dir)
         
         if not test_files:
-            print("⚠️  Could not create test files. Some tests will be skipped.")
+            print("⚠️  Could not set up test files. Tests will be skipped.")
+            return
         
         # Run tests
-        tests = [
-            ("Audio Processing", lambda: test_audio_processing(test_files)),
-            ("Video Processing", lambda: test_video_processing(test_files)),
-            ("Combined Processing", lambda: test_combined_processing(test_files)),
-        ]
+        tests = []
+        
+        # Add tests based on available files
+        if 'audio' in test_files:
+            tests.append(("Audio Processing", lambda: test_audio_processing(test_files)))
+        if 'video' in test_files:
+            tests.append(("Video Processing", lambda: test_video_processing(test_files)))
+        if 'audio' in test_files and 'video' in test_files:
+            tests.append(("Combined Processing", lambda: test_combined_processing(test_files)))
         
         passed = 0
         total = len(tests)

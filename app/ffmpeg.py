@@ -32,29 +32,33 @@ def build_input_stream(segment: InputSegment, index: int):
     if duration > 0:
         input_kwargs['t'] = str(duration)
 
-    stream = ffmpeg.input(segment.file_path, **input_kwargs)
-
+    # Create base input stream
+    base_stream = ffmpeg.input(segment.file_path, **input_kwargs)
+    
+    # Create stream based on type
     if segment.file_type == 'audio':
+        stream = base_stream.audio
         # Apply audio filters
         if segment.volume and segment.volume != 1.0:
-            stream = stream.audio.filter('volume', segment.volume)
+            stream = ffmpeg.filter(stream, 'volume', segment.volume)
         if segment.fade_in:
-            stream = stream.audio.filter('afade', t='in', st=0, d=segment.fade_in)
+            stream = ffmpeg.filter(stream, 'afade', t='in', st=0, d=segment.fade_in)
         if segment.fade_out:
             # Calculate fade out start time based on duration
             fade_out_seconds = _time_to_seconds(segment.fade_out)
             fade_start = duration - fade_out_seconds
-            stream = stream.audio.filter('afade', t='out', st=fade_start, d=segment.fade_out)
+            stream = ffmpeg.filter(stream, 'afade', t='out', st=fade_start, d=segment.fade_out)
 
     elif segment.file_type == 'video':
+        stream = base_stream.video
         # Apply video filters
         if segment.fade_in:
-            stream = stream.video.filter('fade', t='in', st=0, d=segment.fade_in)
+            stream = ffmpeg.filter(stream, 'fade', t='in', st=0, d=segment.fade_in)
         if segment.fade_out:
             # Calculate fade out start time based on duration
             fade_out_seconds = _time_to_seconds(segment.fade_out)
             fade_start = duration - fade_out_seconds
-            stream = stream.video.filter('fade', t='out', st=fade_start, d=segment.fade_out)
+            stream = ffmpeg.filter(stream, 'fade', t='out', st=fade_start, d=segment.fade_out)
 
     return stream
 
@@ -67,27 +71,25 @@ def stitch_ffmpeg_request(request: FfmpegRequest) -> str:
     for i, segment in enumerate(request.input_segments):
         stream = build_input_stream(segment, i)
         if segment.file_type == 'audio':
-            audio_streams.append(stream.audio)
+            audio_streams.append(stream)
         elif segment.file_type == 'video':
-            video_streams.append(stream.video)
+            video_streams.append(stream)
 
     # Process audio streams
     final_audio = None
     if audio_streams:
         if len(audio_streams) > 1:
             # Mix multiple audio streams
-            final_audio = audio_streams[0]
-            for audio in audio_streams[1:]:
-                final_audio = ffmpeg.filter([final_audio, audio], 'amix', inputs=2, duration='shortest')
+            final_audio = ffmpeg.filter(audio_streams, 'amix', inputs=len(audio_streams), duration='shortest')
         else:
             final_audio = audio_streams[0]
 
         # Apply global audio settings
         if request.global_volume and request.global_volume != 1.0:
-            final_audio = final_audio.filter('volume', request.global_volume)
+            final_audio = ffmpeg.filter(final_audio, 'volume', request.global_volume)
 
         if request.normalize_audio:
-            final_audio = final_audio.filter('dynaudnorm')
+            final_audio = ffmpeg.filter(final_audio, 'dynaudnorm')
 
     # Process video streams
     final_video = None
@@ -103,9 +105,9 @@ def stitch_ffmpeg_request(request: FfmpegRequest) -> str:
 
         # Apply video filters
         if request.scale:
-            final_video = final_video.filter('scale', request.scale)
+            final_video = ffmpeg.filter(final_video, 'scale', request.scale)
         if request.fps:
-            final_video = final_video.filter('fps', fps=request.fps)
+            final_video = ffmpeg.filter(final_video, 'fps', fps=request.fps)
 
     # Build output options
     output_kwargs = {
@@ -127,13 +129,20 @@ def stitch_ffmpeg_request(request: FfmpegRequest) -> str:
     if request.quiet:
         output_kwargs['loglevel'] = 'quiet'
 
-    # Create output stream
-    output = ffmpeg.output(
-        final_video if final_video else None,
-        final_audio if final_audio else None,
-        request.output_file,
-        **output_kwargs
-    )
+    # Create output stream based on what streams we have
+    if final_video and final_audio:
+        # Combined video and audio
+        output = ffmpeg.output(final_video, final_audio, request.output_file, **output_kwargs)
+    elif final_video:
+        # Video only
+        output_kwargs['an'] = None  # Disable audio
+        output = ffmpeg.output(final_video, request.output_file, **output_kwargs)
+    elif final_audio:
+        # Audio only
+        output_kwargs['vn'] = None  # Disable video
+        output = ffmpeg.output(final_audio, request.output_file, **output_kwargs)
+    else:
+        raise RuntimeError("No input streams available")
 
     if request.overwrite:
         output = output.overwrite_output()
@@ -146,6 +155,7 @@ def stitch_ffmpeg_request(request: FfmpegRequest) -> str:
         output.run(capture_stdout=True, capture_stderr=True)
     except ffmpeg.Error as e:
         error_msg = e.stderr.decode() if e.stderr else str(e)
-        raise RuntimeError(f"FFmpeg failed: {error_msg}")
+        stdout_msg = e.stdout.decode() if e.stdout else ""
+        raise RuntimeError(f"FFmpeg failed:\nSTDERR:\n{error_msg}\nSTDOUT:\n{stdout_msg}")
 
     return request.output_file

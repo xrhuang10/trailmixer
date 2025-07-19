@@ -8,7 +8,7 @@ class TwelveLabsResponse(BaseModel):
 class AudioCodec(str, Enum):
     AAC = "aac"
     MP3 = "mp3"
-    WAV = "wav"
+    WAV = "pcm_s16le"  # Changed from "wav" to "pcm_s16le"
     FLAC = "flac"
 
 class VideoCodec(str, Enum):
