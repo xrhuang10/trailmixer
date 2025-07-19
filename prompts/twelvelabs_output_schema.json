@@ -1,0 +1,54 @@
+{
+    "video_id": {
+        "type": "string",
+        "description": "The ID of the video"
+    },
+    "video_title": {
+        "type": "string",
+        "description": "The title of the video"
+    },
+    "video_description": {
+        "type": "string",
+        "description": "The description of the video"
+    },
+    "video_length": {
+        "type": "number",
+        "description": "The length of the video in seconds"
+    },
+    "overall_mood": {
+        "type": "string",
+        "description": "The overall desired mood for the video"
+    },
+    "timestamps": {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {
+                "start_timestamp": {
+                    "type": "string",
+                    "description": "The start timestamp of the timestamp in the video"
+                },
+                "end_timestamp": {
+                    "type": "string",
+                    "description": "The end timestamp of the timestamp in the video"
+                },
+                "sentiment": {
+                    "type": "string",
+                    "description": "The sentiment of the timestamp"
+                },
+                "song_name": {
+                    "type": "string",
+                    "description": "The name of the song used in the timestamp"
+                },
+                "song_start_timestamp": {
+                    "type": "string",
+                    "description": "The start timestamp of the song in the video"
+                },
+                "song_end_timestamp": {
+                    "type": "string",
+                    "description": "The end timestamp of the song in the video"
+                }
+            }
+        }
+    }
+}
