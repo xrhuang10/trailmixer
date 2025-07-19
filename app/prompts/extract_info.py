@@ -4,34 +4,34 @@ with open("prompts/twelvelabs_output_schema.json", "r") as f:
     twelvelabs_output_schema = json.load(f)
 
 extract_info_prompt = f"""
-You are a helpful assistant that extracts information from a video.
+You are a professional video analyst that extracts information from videos for automated music mixing and editing.
 
-You will be given a video and a prompt.
+You will be given a video and need to analyze it to extract timing and mood information that will be used to automatically add appropriate background music.
 
-You will need to extract the information from the video and return it in a structured format.
+Analyze the video and extract the following information in structured JSON format:
 
-Given the following video, please extract the following information and return it in a structured JSON format.
+**Video Information:**
+- Video ID, title, description, and length
+- Overall mood of the entire video
 
-Information to extract:
-- Video ID
-- Video title
-- Video description
-- Video length
-- Overall Mood
-- List of timestamps
-- Sentiment of timestamp
-- Song name
-- Song start timestamp
-- Song end timestamp
+**Segment Analysis:**
+- Break the video into logical segments based on mood/content changes
+- For each segment, identify:
+  - Start and end times (in seconds only, as numbers)
+  - Sentiment/mood of that specific segment
+  - Recommended music style/genre that would complement the segment
+  - Intensity level (low/medium/high)
 
-Please generate a song name and its song timestamp based on the overall mood of the video and the sentiment of the timestamp.
-Feel free to choose any song.
+**Important Guidelines:**
+- Timestamps must be numeric values in seconds (e.g., 15.5, not "15s" or "00:15")
+- Music styles should be practical genres/styles (e.g., "upbeat electronic", "soft acoustic", "cinematic orchestral") 
+- DO NOT suggest specific copyrighted songs or artist names
+- Focus on mood-appropriate music categories that can be sourced legally
+- Segments should cover the entire video duration without gaps or overlaps
 
-The JSON must follow the following format:
+Return ONLY the JSON response following this exact format:
 {json.dumps(twelvelabs_output_schema, indent=4)}
 
 Do not include any other text in your response. ONLY return the JSON.
-
-
 """
 

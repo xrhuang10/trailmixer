@@ -17,38 +17,36 @@
     },
     "overall_mood": {
         "type": "string",
-        "description": "The overall desired mood for the video"
+        "description": "The overall mood of the video (e.g., happy, sad, energetic, calm, dramatic, romantic, suspenseful)"
     },
-    "timestamps": {
+    "segments": {
         "type": "array",
+        "description": "Array of video segments with their mood and timing information",
         "items": {
             "type": "object",
             "properties": {
-                "start_timestamp": {
-                    "type": "string",
-                    "description": "The start timestamp of the timestamp in the video"
+                "start_time": {
+                    "type": "number",
+                    "description": "Start time of the segment in seconds"
                 },
-                "end_timestamp": {
-                    "type": "string",
-                    "description": "The end timestamp of the timestamp in the video"
+                "end_time": {
+                    "type": "number", 
+                    "description": "End time of the segment in seconds"
                 },
                 "sentiment": {
                     "type": "string",
-                    "description": "The sentiment of the timestamp"
+                    "description": "The sentiment/mood of this segment (e.g., positive, negative, neutral, exciting, tense, peaceful)"
                 },
-                "song_name": {
+                "music_style": {
                     "type": "string",
-                    "description": "The name of the song used in the timestamp"
+                    "description": "Recommended music style/genre for this segment (e.g., upbeat, ambient, cinematic, acoustic, electronic)"
                 },
-                "song_start_timestamp": {
+                "intensity": {
                     "type": "string",
-                    "description": "The start timestamp of the song in the video"
-                },
-                "song_end_timestamp": {
-                    "type": "string",
-                    "description": "The end timestamp of the song in the video"
+                    "description": "Intensity level of the segment (low, medium, high)"
                 }
-            }
+            },
+            "required": ["start_time", "end_time", "sentiment", "music_style", "intensity"]
         }
     }
 }
