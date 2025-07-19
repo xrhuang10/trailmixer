@@ -34,7 +34,7 @@
       "end_time": 31,
       "sentiment": "Focused",
       "music_style": "Pop",
-      "intensity": "Medium",
+      "intensity": "Low",
       "include": true
     },
     {
@@ -64,9 +64,9 @@
     {
       "start_time": 43,
       "end_time": 46,
-      "sentiment": "Focused",
+      "sentiment": "Concentrated",
       "music_style": "Pop",
-      "intensity": "Medium",
+      "intensity": "Low",
       "include": true
     },
     {
@@ -82,7 +82,7 @@
       "end_time": 67,
       "sentiment": "Playful",
       "music_style": "Pop",
-      "intensity": "Medium",
+      "intensity": "Low",
       "include": true
     },
     {
@@ -106,7 +106,7 @@
       "end_time": 76,
       "sentiment": "Focused",
       "music_style": "Pop",
-      "intensity": "Medium",
+      "intensity": "Low",
       "include": true
     },
     {
@@ -114,7 +114,7 @@
       "end_time": 79,
       "sentiment": "Social",
       "music_style": "Pop",
-      "intensity": "Low",
+      "intensity": "Medium",
       "include": true
     },
     {
@@ -128,9 +128,9 @@
     {
       "start_time": 83,
       "end_time": 86,
-      "sentiment": "Friendly",
+      "sentiment": "Interactive",
       "music_style": "Pop",
-      "intensity": "Low",
+      "intensity": "Medium",
       "include": true
     },
     {
@@ -138,13 +138,13 @@
       "end_time": 89,
       "sentiment": "Informative",
       "music_style": "Pop",
-      "intensity": "Medium",
+      "intensity": "Low",
       "include": true
     },
     {
       "start_time": 90,
       "end_time": 94,
-      "sentiment": "Engaged",
+      "sentiment": "Entertained",
       "music_style": "Pop",
       "intensity": "Medium",
       "include": true
@@ -152,7 +152,7 @@
     {
       "start_time": 94,
       "end_time": 97,
-      "sentiment": "Confident",
+      "sentiment": "Innovative",
       "music_style": "Pop",
       "intensity": "High",
       "include": true
@@ -160,15 +160,15 @@
     {
       "start_time": 97,
       "end_time": 100,
-      "sentiment": "Focused",
+      "sentiment": "Curious",
       "music_style": "Pop",
-      "intensity": "Medium",
+      "intensity": "Low",
       "include": true
     },
     {
       "start_time": 100,
       "end_time": 103,
-      "sentiment": "Thoughtful",
+      "sentiment": "Reflective",
       "music_style": "Pop",
       "intensity": "Medium",
       "include": true
@@ -176,23 +176,23 @@
     {
       "start_time": 103,
       "end_time": 106,
-      "sentiment": "Focused",
-      "music_style": "Pop",
-      "intensity": "Medium",
-      "include": true
-    },
-    {
-      "start_time": 106,
-      "end_time": 109,
       "sentiment": "Confident",
       "music_style": "Pop",
       "intensity": "High",
       "include": true
     },
     {
+      "start_time": 106,
+      "end_time": 109,
+      "sentiment": "Amused",
+      "music_style": "Pop",
+      "intensity": "Low",
+      "include": true
+    },
+    {
       "start_time": 109,
       "end_time": 112,
-      "sentiment": "Focused",
+      "sentiment": "Empowered",
       "music_style": "Pop",
       "intensity": "Medium",
       "include": true
@@ -200,23 +200,23 @@
     {
       "start_time": 112,
       "end_time": 115,
-      "sentiment": "Focused",
+      "sentiment": "Determined",
       "music_style": "Pop",
-      "intensity": "Medium",
+      "intensity": "High",
       "include": true
     },
     {
       "start_time": 115,
       "end_time": 118,
-      "sentiment": "Focused",
+      "sentiment": "Inspired",
       "music_style": "Pop",
-      "intensity": "Medium",
+      "intensity": "Low",
       "include": true
     },
     {
       "start_time": 118,
       "end_time": 121,
-      "sentiment": "Focused",
+      "sentiment": "Motivated",
       "music_style": "Pop",
       "intensity": "Medium",
       "include": true
@@ -226,24 +226,24 @@
     "tracks": [
       {
         "start": 0,
-        "end": 19,
+        "end": 20,
         "style": "Pop",
         "intensity": "High",
         "sentiment": "Energetic"
       },
       {
-        "start": 19,
-        "end": 46,
+        "start": 20,
+        "end": 40,
         "style": "Pop",
         "intensity": "Medium",
         "sentiment": "Focused"
       },
       {
-        "start": 46,
-        "end": 62,
+        "start": 40,
+        "end": 60,
         "style": "Pop",
         "intensity": "Low",
-        "sentiment": "Calm"
+        "sentiment": "Fun"
       }
     ]
   }

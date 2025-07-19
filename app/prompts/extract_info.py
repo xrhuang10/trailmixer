@@ -119,14 +119,14 @@ Use the following structure for the `"music"` object:
             "end": length_a,
             "style": "<one of: Classical, Hip Hop, Pop, Electronic, Meme>",
             "intensity": "<analyzed intensity>",
-            "sentiment": "<one word from: {', '.join(sentiment_list)}>"
+            "sentiment": "<one word from: {', '.join(sentiment_list)} that is different from the other tracks>"
         }},
         {{
             "start": length_a,
             "end": length_b,
             "style": "<different style from above>",
             "intensity": "<analyzed intensity>",
-            "sentiment": "<different sentiment from above>"
+            "sentiment": "<one word from: {', '.join(sentiment_list)} that is different from the other tracks>"
         }},
         ...
         {{
@@ -134,7 +134,7 @@ Use the following structure for the `"music"` object:
             "end": total_duration_of_included_segments (must be the lesser of {desired_length} and video length),
             "style": "<style not repeated in other tracks>",
             "intensity": "<analyzed intensity>",
-            "sentiment": "<sentiment not repeated in other tracks>"
+            "sentiment": "<one word from: {', '.join(sentiment_list)} that is different from the other tracks>"
         }}
     ]
 }}'''}

@@ -311,3 +311,6 @@ class MultiVideoFFmpegRequest(BaseModel):
     global_volume: float = Field(0.3, description="Global background music volume")
     crossfade_duration: str = Field("1.0", description="Crossfade duration between segments")
     video_transition_duration: str = Field("0.5", description="Transition duration between videos")
+    
+class VideoSegmentWithAudio(VideoSegment):
+    pass
