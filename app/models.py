@@ -239,3 +239,38 @@ class FfmpegRequest(BaseModel):
                 "priority": 5
             }
         }
+
+# === Audio Library and Selection Models ===
+class AudioLibrary(BaseModel):
+    """Audio library mapping for different music styles and moods"""
+    happy_files: List[str] = Field(default=["music/happy.mp3"], description="Audio files for happy/positive moods")
+    sad_files: List[str] = Field(default=["music/sad.mp3"], description="Audio files for sad/negative moods")
+    neutral_files: List[str] = Field(default=["music/output_audio.mp3"], description="Audio files for neutral moods")
+    energetic_files: List[str] = Field(default=["music/happy.mp3"], description="Audio files for energetic moods")
+    calm_files: List[str] = Field(default=["music/sad.mp3"], description="Audio files for calm moods")
+
+class AudioSelection(BaseModel):
+    """Selected audio file for a video segment"""
+    audio_file: str = Field(..., description="Path to selected audio file")
+    volume: float = Field(1.0, description="Volume level (0.0-2.0)")
+    fade_in: Optional[str] = Field(None, description="Fade in duration")
+    fade_out: Optional[str] = Field(None, description="Fade out duration")
+
+class VideoSegmentWithAudio(VideoSegment):
+    """Extended video segment with audio selection"""
+    audio_selection: Optional[AudioSelection] = Field(None, description="Selected audio for this segment")
+
+class EnhancedSentimentAnalysisData(SentimentAnalysisData):
+    """Enhanced sentiment analysis data with audio selections"""
+    segments: List[VideoSegmentWithAudio] = Field(..., description="Video segments with audio selections")
+    audio_library: AudioLibrary = Field(default_factory=AudioLibrary, description="Available audio library")
+
+# === Audio Processing Request ===
+class AudioPickingRequest(BaseModel):
+    """Request for picking audio based on sentiment analysis"""
+    sentiment_data: SentimentAnalysisData = Field(..., description="Original sentiment analysis data")
+    original_video_path: str = Field(..., description="Path to original video file")
+    output_video_path: str = Field(..., description="Path for output video file")
+    audio_library: Optional[AudioLibrary] = Field(default_factory=AudioLibrary, description="Audio library to choose from")
+    global_volume: float = Field(0.3, description="Global background music volume")
+    crossfade_duration: str = Field("1.0", description="Crossfade duration between audio segments")
