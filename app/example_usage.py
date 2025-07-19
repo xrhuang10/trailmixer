@@ -13,7 +13,7 @@ from pathlib import Path
 # Add the parent directory to the path so we can import our modules
 sys.path.append(str(Path(__file__).parent))
 
-from ffmpeg import FFmpegProcessor, StitchRequest, MediaSegment, create_stitch_request_from_timestamps
+from ffmpeg_stitch import FFmpegProcessor, StitchRequest, MediaSegment, create_stitch_request_from_timestamps
 
 def example_basic_stitching():
     """
