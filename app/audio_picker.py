@@ -3,6 +3,7 @@ Audio selection logic for video sentiment analysis
 """
 import os
 import json
+from typing import Any
 
 def map_sentiment_to_filename(sentiment: str) -> str:
     """
@@ -44,17 +45,23 @@ def map_sentiment_to_filename(sentiment: str) -> str:
         # Default fallback
         return 'calm'
 
-def get_music_file_paths(analysis_file_path: str) -> list[str]:
+def get_music_file_paths(analysis_file_path: str) -> dict[str, dict[str, Any]]:
     with open(analysis_file_path, 'r') as f:
         analysis_data = json.load(f)
     tracks = analysis_data.get('music', {}).get('tracks', [])
     
-    music_file_paths = []
+    music_file_paths = {}
     for track in tracks:
-        style = track['style']
-        sentiment = track['sentiment']
-        filename = os.path.join('..', 'music', style, f'{sentiment}.mp3')
-        music_file_paths.append(filename)
+        track_dict = {}
+        
+        track_dict['style'] = track['style']
+        track_dict['sentiment'] = track['sentiment']
+        track_dict['intensity'] = track['intensity']
+        track_dict['start'] = track['start']
+        track_dict['end'] = track['end']
+        
+        filename = os.path.join('..', 'music', track['style'], f'{track['sentiment']}.mp3')
+        music_file_paths[filename] = track_dict
         
     return music_file_paths
 

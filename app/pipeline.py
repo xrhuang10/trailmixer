@@ -6,14 +6,16 @@ import os
 from typing import Dict
 from models import (
     JobStatus, JobInfo, MultiVideoJobInfo, SentimentAnalysisRequest, SentimentAnalysisData,
-    VideoProcessingRequest, AudioLibrary, VideoAnalysisResult, MultiVideoFFmpegRequest
+    VideoProcessingRequest, AudioLibrary, VideoAnalysisResult, MultiVideoFFmpegRequest, FfmpegRequest
 )
+from ffmpeg_builder import create_ffmpeg_request
 
 from video_processor import analyze_sentiment_with_twelvelabs, process_video_segments, process_single_video_in_batch
 from ffmpeg_builder import create_multi_video_ffmpeg_request
 from prompts.extract_info import extract_info_prompt
 from twelvelabs_client import upload_video_to_twelvelabs
 from audio_picker import get_music_file_paths
+from ffmpeg_stitch import stitch_ffmpeg_request
 
 def process_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
     """Complete video processing pipeline"""
@@ -61,6 +63,7 @@ def process_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
             print(f"🎵 Found {len(music_file_paths)} music file paths")
         else:
             print("❌ No sentiment analysis file path available for music selection")
+        print(f"Music file paths: {music_file_paths}")
         
         # Testing if the music file paths are valid
         all_exist = True
@@ -76,6 +79,111 @@ def process_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
             print("Some music file paths are invalid.")
             
         print("Step 3 complete!")
+        
+        # Get sentiment data as dictionary
+        raw_data = job.sentiment_analysis.sentiment_analysis
+        if isinstance(raw_data, str):
+            print("❌ Cannot create FFmpeg request: sentiment analysis failed")
+            return
+        
+        # Convert to dict if needed
+        if hasattr(raw_data, 'dict'):
+            sentiment_data = dict(raw_data.dict())
+        else:
+            sentiment_data = dict(raw_data)
+        
+        # Create FfmpegRequest with video and audio segments
+        from models import InputSegment
+        
+        output_path = f'../processed_videos/{job_id}_processed.mp4'
+        input_segments = []
+        
+        # Add original video as input segment
+        video_length = sentiment_data.get('video_length', 60)
+        video_segment = InputSegment(
+            file_path=file_path,
+            file_type='video',
+            start_time='00:00:00',
+            end_time=f'{int(video_length//3600):02d}:{int((video_length%3600)//60):02d}:{int(video_length%60):02d}',
+            clip_start='00:00:00',
+            clip_end=None,
+            volume=1.0,
+            fade_in=None,
+            fade_out=None,
+            metadata=None
+        )
+        input_segments.append(video_segment)
+        
+        # Add audio segments from music file paths
+        print(f"🎵 Adding {len(music_file_paths)} audio segments...")
+        for audio_file, timing_info in music_file_paths.items():
+            start_time = timing_info.get('start', 0)
+            end_time = timing_info.get('end', 60)
+            
+            # Convert seconds to HH:MM:SS format
+            start_formatted = f'{int(start_time//3600):02d}:{int((start_time%3600)//60):02d}:{int(start_time%60):02d}'
+            end_formatted = f'{int(end_time//3600):02d}:{int((end_time%3600)//60):02d}:{int(end_time%60):02d}'
+            
+            audio_segment = InputSegment(
+                file_path=audio_file,
+                file_type='audio',
+                start_time=start_formatted,
+                end_time=end_formatted,
+                clip_start='00:00:00',
+                clip_end=None,
+                volume=0.3,  # Background music volume
+                fade_in='0.5',
+                fade_out='0.5',
+                metadata=None
+            )
+            input_segments.append(audio_segment)
+            print(f"   🎼 Added: {os.path.basename(audio_file)} ({start_formatted} - {end_formatted})")
+        
+        # Create FFmpeg request
+        from models import VideoCodec, AudioCodec
+        ffmpeg_request = FfmpegRequest(
+            input_segments=input_segments,
+            output_file=output_path,
+            video_codec=VideoCodec.H264,
+            audio_codec=AudioCodec.AAC,
+            video_bitrate=None,
+            audio_bitrate=None,
+            crf=23,
+            preset='medium',
+            scale=None,
+            fps=None,
+            audio_channels=2,
+            audio_sample_rate=44100,
+            global_volume=0.3,
+            normalize_audio=False,
+            crossfade_duration='1.0',
+            gap_duration='00:00:00',
+            overwrite=True,
+            quiet=False,
+            progress=True,
+            request_id=job_id,
+            priority=1
+        )
+        
+        # Execute FFmpeg processing
+        print(f"🎬 Step 4: Executing FFmpeg processing...")
+        try:
+            result_path = stitch_ffmpeg_request(ffmpeg_request)
+            
+            # Update job status
+            job.status = JobStatus.COMPLETED
+            job.message = f"Video processing completed successfully for '{filename}' with background music"
+            job.processed_video = {
+                "output_path": result_path,
+                "total_segments": len(input_segments),
+                "audio_segments_count": len(music_file_paths)
+            }
+            
+            print(f"✅ Pipeline completed successfully for '{filename}'!")
+            print(f"   📁 Output: {os.path.basename(result_path)}")
+            
+        except Exception as ffmpeg_error:
+            raise RuntimeError(f"FFmpeg processing failed: {str(ffmpeg_error)}")
         
     except Exception as e:
         job.status = JobStatus.FAILED
@@ -176,8 +284,3 @@ def process_multi_video_pipeline(job_id: str, multi_video_job_status: Dict[str, 
         job.message = f"Multi-video processing failed: {str(e)}"
         print(f"❌ Multi-video pipeline failed (Job: {job_id}): {str(e)}") 
 
-if __name__ == "__main__":
-    if not os.path.exists('app/llm_answers/20250719_153005_687bf1db2b144dc12e0316fa.json'):
-        print('NOPE')
-    else:
-        print('OK')
