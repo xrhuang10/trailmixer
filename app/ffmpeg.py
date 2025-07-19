@@ -22,15 +22,15 @@ def build_input_stream(segment: InputSegment, index: int):
     """Builds the input stream with filters applied based on segment options."""
     input_kwargs = {}
 
-    # Calculate duration from start_time and end_time
-    start_seconds = _time_to_seconds(segment.start_time)
-    end_seconds = _time_to_seconds(segment.end_time)
-    duration = end_seconds - start_seconds
+    # Handle clip selection from input file
+    clip_start_seconds = _time_to_seconds(segment.clip_start or "00:00:00")
+    clip_end_seconds = _time_to_seconds(segment.clip_end or "23:59:59")
+    clip_duration = clip_end_seconds - clip_start_seconds
 
-    if segment.start_time:
-        input_kwargs['ss'] = segment.start_time
-    if duration > 0:
-        input_kwargs['t'] = str(duration)
+    if segment.clip_start:
+        input_kwargs['ss'] = segment.clip_start
+    if segment.clip_end:
+        input_kwargs['t'] = str(clip_duration)
 
     # Create base input stream
     base_stream = ffmpeg.input(segment.file_path, **input_kwargs)
@@ -46,8 +46,14 @@ def build_input_stream(segment: InputSegment, index: int):
         if segment.fade_out:
             # Calculate fade out start time based on duration
             fade_out_seconds = _time_to_seconds(segment.fade_out)
-            fade_start = duration - fade_out_seconds
+            fade_start = clip_duration - fade_out_seconds
             stream = ffmpeg.filter(stream, 'afade', t='out', st=fade_start, d=segment.fade_out)
+        
+        # Handle placement timing
+        start_seconds = _time_to_seconds(segment.start_time)
+        if start_seconds > 0:
+            # Add silence before the audio to place it at the right time
+            stream = ffmpeg.filter(stream, 'adelay', f'{int(start_seconds * 1000)}|{int(start_seconds * 1000)}')
 
     elif segment.file_type == 'video':
         stream = base_stream.video
@@ -57,7 +63,7 @@ def build_input_stream(segment: InputSegment, index: int):
         if segment.fade_out:
             # Calculate fade out start time based on duration
             fade_out_seconds = _time_to_seconds(segment.fade_out)
-            fade_start = duration - fade_out_seconds
+            fade_start = clip_duration - fade_out_seconds
             stream = ffmpeg.filter(stream, 'fade', t='out', st=fade_start, d=segment.fade_out)
 
     return stream
@@ -73,14 +79,29 @@ def stitch_ffmpeg_request(request: FfmpegRequest) -> str:
         if segment.file_type == 'audio':
             audio_streams.append(stream)
         elif segment.file_type == 'video':
+            # For video type, handle both video and audio streams
             video_streams.append(stream)
+            if segment.volume and segment.volume > 0:  # Only add audio if volume > 0
+                # Get audio stream from the same input
+                audio_kwargs = {}
+                if segment.clip_start:
+                    audio_kwargs['ss'] = segment.clip_start
+                if segment.clip_end:
+                    clip_start_seconds = _time_to_seconds(segment.clip_start or "00:00:00")
+                    clip_end_seconds = _time_to_seconds(segment.clip_end)
+                    audio_kwargs['t'] = str(clip_end_seconds - clip_start_seconds)
+                
+                audio_stream = ffmpeg.input(segment.file_path, **audio_kwargs).audio
+                if segment.volume != 1.0:
+                    audio_stream = ffmpeg.filter(audio_stream, 'volume', segment.volume)
+                audio_streams.append(audio_stream)
 
     # Process audio streams
     final_audio = None
     if audio_streams:
         if len(audio_streams) > 1:
             # Mix multiple audio streams
-            final_audio = ffmpeg.filter(audio_streams, 'amix', inputs=len(audio_streams), duration='shortest')
+            final_audio = ffmpeg.filter(audio_streams, 'amix', inputs=len(audio_streams), duration='longest')
         else:
             final_audio = audio_streams[0]
 
