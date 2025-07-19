@@ -79,16 +79,17 @@ def prompt_twelvelabs(video_id: str, prompt: str) -> Optional[GenerateOpenEndedT
         The response from Twelve Labs
     """
     try:
-        print(f"Prompting Twelve Labs with video ID: {video_id} ")
+        print(f"Prompting Twelve Labs with video ID: {video_id}")
+        
         response = twelve_labs_client.analyze(
             video_id=video_id,
             prompt=prompt
         )
-        print(f"Prompting complete!")
+        print(f"Prompting complete! Response received.")
         return response
     except Exception as e:
         print(f"Error prompting Twelve Labs: {str(e)}")
-        raise e
+        raise e  # Re-raise the exception so the caller can handle it
 
 def clean_llm_string_output_to_json(string: str) -> Dict[str, Any]:
     """
