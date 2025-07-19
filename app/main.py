@@ -5,6 +5,7 @@ from typing import Dict, List
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 
 # Import models
 from models import (
@@ -21,6 +22,15 @@ from pipeline import process_video_pipeline, process_multi_video_pipeline
 from video_processor import extract_segments
 
 app = FastAPI(title="TrailMixer Video Processing API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Allow Next.js dev server
+    allow_credentials=True,
+    allow_methods=["*"],                      # Allow all HTTP methods
+    allow_headers=["*"],                      # Allow all headers
+)
+
 
 # Serve static files for processed videos
 app.mount("/static", StaticFiles(directory="../processed_videos"), name="static")
