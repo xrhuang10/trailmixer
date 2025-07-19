@@ -298,7 +298,7 @@ def test_combined_processing(test_files, args):
         
         output_path = ensure_output_dir() / "output_combined.mp4"
         
-        # Create video segment with muted audio
+        # Create video segment
         video_segment = InputSegment(
             file_path=test_files['video'],
             file_type='video',
@@ -306,7 +306,7 @@ def test_combined_processing(test_files, args):
             end_time=args.video_end,
             clip_start=args.video_clip_start,
             clip_end=args.video_clip_end,
-            volume=0.0,  # Mute original audio
+            volume=args.video_volume,  # Use video volume from args instead of muting
             fade_in=None,
             fade_out=None,
             metadata=None
