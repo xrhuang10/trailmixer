@@ -1,12 +1,13 @@
 import os
 import uuid
+import datetime
 from typing import Dict, Optional
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 # Import helper functions (to be implemented)
-from twelvelabs_client import upload_video_to_twelvelabs, prompt_twelvelabs
+from twelvelabs_client import upload_video_to_twelvelabs, prompt_twelvelabs, clean_llm_string_output_to_json, export_to_json_file
 from prompts.extract_info import extract_info_prompt
 
 app = FastAPI(title="TrailMixer Video Processing API")
@@ -36,8 +37,28 @@ def process_video_with_sentiment(file_path: str, sentiment_data: dict, output_pa
 
 def analyze_sentiment_with_twelvelabs(video_id: str) -> dict:
     """Helper function to analyze sentiment using Twelve Labs"""
-    result = prompt_twelvelabs(video_id, extract_info_prompt)
-    return {"sentiment_analysis": result.data if result else "Analysis failed"}
+    try:
+        print(f"Starting sentiment analysis for video ID: {video_id}")
+        response = prompt_twelvelabs(video_id, extract_info_prompt)
+        
+        if response and hasattr(response, 'data'):
+            print(f"Sentiment analysis completed successfully!")
+            cleaned_json = clean_llm_string_output_to_json(response.data)
+            print(f"Cleaned JSON: {cleaned_json}")
+            
+            # Use timestamp_video_id format instead of video title to avoid special characters
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            exported_file = export_to_json_file(cleaned_json, f"{timestamp}_{video_id}.json")
+            if exported_file:
+                print(f"📁 File saved to: {exported_file}")
+            return {"sentiment_analysis": response.data}
+        else:
+            print(f"No data received from Twelve Labs")
+            return {"sentiment_analysis": "No analysis data received"}
+            
+    except Exception as e:
+        print(f"Error during sentiment analysis: {str(e)}")
+        return {"sentiment_analysis": f"Analysis failed: {str(e)}"}
 
 def process_video_segments(file_path: str, sentiment_data: dict, job_id: str) -> dict:
     """Helper function to process video with FFmpeg based on sentiment"""
@@ -52,7 +73,7 @@ def process_video_segments(file_path: str, sentiment_data: dict, job_id: str) ->
     }
 
 # Background processing function
-def process_video_pipeline(job_id: str, filename: str):
+def process_video_pipeline(job_id: str):
     """Complete video processing pipeline"""
     try:
         # Step 1: Upload to Twelve Labs for indexing
@@ -91,11 +112,14 @@ def process_video_pipeline(job_id: str, filename: str):
 
 # ==================== API ENDPOINTS ====================
 
+# WORKS!!!!
 @app.post('/api/video/upload')
 def upload_video(background_tasks: BackgroundTasks, video_file: UploadFile = File(...)):
     """
     Step 1: Upload video and start the complete processing pipeline
     """
+    print(f"Uploading video: {video_file.filename}")
+    
     # Validate file type
     if not video_file.content_type or not video_file.content_type.startswith('video/'):
         raise HTTPException(status_code=400, detail="File must be a video")
@@ -132,7 +156,9 @@ def upload_video(background_tasks: BackgroundTasks, video_file: UploadFile = Fil
     }
     
     # Start complete processing pipeline
-    background_tasks.add_task(process_video_pipeline, job_id, video_file.filename)
+    background_tasks.add_task(process_video_pipeline, job_id)
+    
+    print(f"Processing pipeline started for job {job_id}")
     
     return JSONResponse(
         status_code=202,

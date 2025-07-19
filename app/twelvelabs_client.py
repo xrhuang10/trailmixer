@@ -79,16 +79,17 @@ def prompt_twelvelabs(video_id: str, prompt: str) -> Optional[GenerateOpenEndedT
         The response from Twelve Labs
     """
     try:
-        print(f"Prompting Twelve Labs with video ID: {video_id} ")
+        print(f"Prompting Twelve Labs with video ID: {video_id}")
+        
         response = twelve_labs_client.analyze(
             video_id=video_id,
             prompt=prompt
         )
-        print(f"Prompting complete!")
+        print(f"Prompting complete! Response received.")
         return response
     except Exception as e:
         print(f"Error prompting Twelve Labs: {str(e)}")
-        raise e
+        raise e  # Re-raise the exception so the caller can handle it
 
 def clean_llm_string_output_to_json(string: str) -> Dict[str, Any]:
     """
@@ -154,7 +155,7 @@ def export_to_json_file(cleaned_data: Dict[str, Any], filename: str) -> str:
 # For testing
 if __name__ == "__main__":
     # upload_video_to_twelvelabs("..\\files\\speed.mp4")
-    response = prompt_twelvelabs("687b0e4861acc759544004a1", extract_info_prompt)
+    response = prompt_twelvelabs("6879c34866a5cd95fe3e3667", extract_info_prompt)
     if response:
         # Get cleaned data
         
@@ -164,7 +165,7 @@ if __name__ == "__main__":
         
         # Use timestamp_video_id format instead of video title to avoid special characters
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        video_id = "687b0e4861acc759544004a1"  # Use actual video_id from the test
+        video_id = "6879c34866a5cd95fe3e3667"  # Use actual video_id from the test
         exported_file = export_to_json_file(cleaned_json, f"{timestamp}_{video_id}.json")
         if exported_file:
             print(f"📁 File saved to: {exported_file}")
