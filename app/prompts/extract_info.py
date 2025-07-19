@@ -105,7 +105,7 @@ Each segment should include:
               "end": {desired_length},
               "style": "{music_style}",
               "intensity": "{music_intensity}"
-              "sentiment": The single overall sentiment of the track, which should be a single word from the following list: {sentiment_list}
+              "sentiment": The single overall sentiment of the track, which should strictly be a single word from the following list: {sentiment_list}
           }}
       ]
   }}
@@ -127,7 +127,7 @@ Each segment should include:
 - VERY VERY IMPORTANT: The total duration of all segments where `"include": true` MUST NOT exceed {desired_length} seconds.
 - Only select the most meaningful scenes for inclusion.
 - Segments without "include": true will be ignored for the final cropped video and music generation.
-- For each track, the sentiment should be the single overall sentiment of the track, which should be a single word from the following list: {sentiment_list}
+- For each track, the sentiment should be the single overall sentiment of the track, which should be a single word strictly from the following list: {sentiment_list}
 
 Return ONLY the JSON response following this exact format:
 {json.dumps(twelvelabs_output_schema, indent=4)}

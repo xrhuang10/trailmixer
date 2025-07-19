@@ -53,7 +53,7 @@ def process_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
         # Step 3: Select background audio based on sentiment analysis
         job.status = JobStatus.PROCESSING
         job.message = f"Selecting background music for '{filename}' based on video sentiment..."
-        print(f"🎵 Step 3: Selecting background music for '{filename}'...")
+        print(f"🎵 Step 3: Selecting background music tracks for '{filename}' based on AI analysis...")
         
         if isinstance(sentiment_result.sentiment_analysis, SentimentAnalysisData):
             sentiment_data = sentiment_result.sentiment_analysis

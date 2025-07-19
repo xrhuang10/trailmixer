@@ -129,11 +129,12 @@ def process_video_segments(request: VideoProcessingRequest) -> VideoProcessingRe
             crossfade_duration="1.0"  # 1 second crossfade between segments
         )
         
-        # Pick audio tracks based on sentiment analysis
-        segments_with_audio = pick_audio(audio_request.sentiment_data, audio_request.audio_library)
+        # Use extracted audio picker logic for Step 3
+        from audio_processor_core import process_audio_for_pipeline_step3
+        segments_with_audio = process_audio_for_pipeline_step3(audio_request.sentiment_data, audio_request.global_volume)
         
-        print(f"🎵 Audio selection complete for '{request.sentiment_data.video_title}'!")
-        print(f"📊 FFmpeg request created with {len(segments_with_audio)} segments")
+        print(f"✅ Step 3 Complete: Audio selection finished for '{request.sentiment_data.video_title}'!")
+        print(f"📊 Generated {len(segments_with_audio)} audio segments for background music")
         
         # Create the FFmpeg request
         ffmpeg_request = create_ffmpeg_request(
@@ -155,8 +156,8 @@ def process_video_segments(request: VideoProcessingRequest) -> VideoProcessingRe
         print(f"  🎵 Audio tracks: {len(audio_segments)}")
         
         for i, segment in enumerate(audio_segments):
-            sentiment = segment.metadata.get("sentiment", "unknown")
-            music_style = segment.metadata.get("music_style", "unknown") 
+            sentiment = segment.metadata.get("sentiment", "unknown") if segment.metadata else "unknown"
+            music_style = segment.metadata.get("music_style", "unknown") if segment.metadata else "unknown"
             audio_file = os.path.basename(segment.file_path)
             print(f"    Audio {i+1}: {audio_file} | {sentiment} | {music_style} | Vol: {segment.volume:.2f}")
         
@@ -217,11 +218,26 @@ def process_single_video_in_batch(video_result: VideoAnalysisResult, audio_libra
             sentiment_data = sentiment_result.sentiment_analysis
             video_result.video_length = sentiment_data.video_length
             
-            print(f"🎵 Selecting audio for '{video_result.filename}' | Duration: {sentiment_data.video_length}s | Segments: {len(sentiment_data.segments)}")
-            segments_with_audio = pick_audio(sentiment_data, audio_library)
+            print(f"🎵 Step 3: Selecting background music tracks for '{video_result.filename}' | Duration: {sentiment_data.video_length}s")
+            
+            # Use extracted audio processor logic for multi-video pipeline
+            from audio_processor_core import process_tracks_and_create_audio_segments, log_pipeline_step3_results
+            segments_with_audio = process_tracks_and_create_audio_segments(sentiment_data, global_volume=0.3)
             video_result.segments_with_audio = segments_with_audio
             
-            print(f"✅ Audio selection complete for '{video_result.filename}' | Selected music for {len(segments_with_audio)} segments")
+            print(f"✅ Audio track selection complete for '{video_result.filename}' | Selected music for {len(segments_with_audio)} segments")
+            
+            # Use extracted logging for this video in multi-video pipeline
+            print(f"🎼 CHOSEN TRACKS for '{video_result.filename}':")
+            if segments_with_audio:
+                for i, segment in enumerate(segments_with_audio):
+                    if segment.audio_selection:
+                        audio_filename = os.path.basename(segment.audio_selection.audio_file)
+                        duration = segment.end_time - segment.start_time
+                        print(f"  ✓ {audio_filename} | {segment.start_time}s→{segment.end_time}s ({duration:.1f}s) | {segment.music_style}/{segment.sentiment}")
+                print(f"  📊 Total: {sum(seg.end_time - seg.start_time for seg in segments_with_audio):.1f}s background music")
+            else:
+                print(f"  ⚠️ No tracks selected for '{video_result.filename}'")
         
         video_result.success = True
         print(f"🎉 Successfully processed video {video_result.video_index + 1}: '{video_result.filename}'")
