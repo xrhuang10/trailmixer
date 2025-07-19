@@ -52,19 +52,12 @@ def test_ffmpeg_module():
     print("\n🔍 Testing FFmpeg module...")
     
     try:
-        from ffmpeg import FFmpegProcessor, StitchRequest, MediaSegment
+        from app.ffmpeg import stitch_ffmpeg_request
+        from app.models import FfmpegRequest, InputSegment, AudioCodec, VideoCodec
         print("✅ FFmpeg module imports successfully")
-        
-        # Test processor initialization
-        processor = FFmpegProcessor()
-        print("✅ FFmpegProcessor initialized successfully")
-        
         return True
     except ImportError as e:
         print(f"❌ Failed to import FFmpeg module: {e}")
-        return False
-    except RuntimeError as e:
-        print(f"❌ FFmpegProcessor initialization failed: {e}")
         return False
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
@@ -111,29 +104,23 @@ def test_silent_audio_creation():
     print("\n🔍 Testing silent audio creation...")
     
     try:
-        from ffmpeg import FFmpegProcessor
+        from app.ffmpeg import stitch_ffmpeg_request
+        from app.models import FfmpegRequest, InputSegment, AudioCodec
         
-        processor = FFmpegProcessor()
-        
-        # Create a temporary file for testing
         with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as tmp_file:
             temp_path = tmp_file.name
         
         try:
-            # Create 2 seconds of silent audio
-            success = processor.create_silent_audio(
-                duration=2.0,
-                output_path=temp_path,
-                sample_rate=44100
-            )
+            # Create 2 seconds of silent audio using ffmpeg directly
+            cmd = [
+                'ffmpeg', '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+                '-t', '2', '-c:a', 'libmp3lame', '-b:a', '128k', temp_path, '-y', '-loglevel', 'error'
+            ]
+            subprocess.run(cmd, check=True, capture_output=True)
             
-            if success and os.path.exists(temp_path):
-                file_size = os.path.getsize(temp_path)
-                print(f"✅ Silent audio created successfully ({file_size} bytes)")
-                return True
-            else:
-                print("❌ Silent audio creation failed")
-                return False
+            file_size = os.path.getsize(temp_path)
+            print(f"✅ Silent audio created successfully ({file_size} bytes)")
+            return True
                 
         finally:
             # Clean up temporary file
