@@ -29,7 +29,7 @@ def test_video_upload():
     # Step 1: Upload video
     try:
         with open(VIDEO_FILE_PATH, 'rb') as video_file:
-            files = {'video_file': video_file}
+            files = {'video_file': ('speed.mp4', video_file, 'video/mp4')}
             response = requests.post(f"{API_BASE_URL}/api/video/upload", files=files)
         
         if response.status_code == 202:
