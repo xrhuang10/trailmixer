@@ -35,6 +35,9 @@ def build_input_stream(segment: InputSegment, index: int):
     # Create base input stream
     base_stream = ffmpeg.input(segment.file_path, **input_kwargs)
     
+    # Initialize stream as None
+    stream = None
+    
     # Create stream based on type
     if segment.file_type == 'audio':
         stream = base_stream.audio
@@ -65,7 +68,11 @@ def build_input_stream(segment: InputSegment, index: int):
             fade_out_seconds = _time_to_seconds(segment.fade_out)
             fade_start = clip_duration - fade_out_seconds
             stream = ffmpeg.filter(stream, 'fade', t='out', st=fade_start, d=segment.fade_out)
-
+    
+    # Handle invalid file type
+    if stream is None:
+        raise ValueError(f"Invalid file type: {segment.file_type}. Must be 'audio' or 'video'.")
+        
     return stream
 
 def stitch_ffmpeg_request(request: FfmpegRequest) -> str:
@@ -126,14 +133,16 @@ def stitch_ffmpeg_request(request: FfmpegRequest) -> str:
 
         # Apply video filters
         if request.scale:
-            final_video = ffmpeg.filter(final_video, 'scale', request.scale)
+            # Parse width and height from scale parameter
+            width, height = request.scale.split(':')
+            final_video = ffmpeg.filter(final_video, 'scale', width=width, height=height)
         if request.fps:
             final_video = ffmpeg.filter(final_video, 'fps', fps=request.fps)
 
     # Build output options
     output_kwargs = {
         'vcodec': request.video_codec,
-        'acodec': request.audio_codec,
+        'acodec': request.audio_codec.value if hasattr(request.audio_codec, 'value') else request.audio_codec,
         'preset': request.preset
     }
 
@@ -147,8 +156,6 @@ def stitch_ffmpeg_request(request: FfmpegRequest) -> str:
         output_kwargs['ac'] = request.audio_channels
     if request.audio_sample_rate:
         output_kwargs['ar'] = request.audio_sample_rate
-    if request.quiet:
-        output_kwargs['loglevel'] = 'quiet'
 
     # Create output stream based on what streams we have
     if final_video and final_audio:
@@ -168,15 +175,20 @@ def stitch_ffmpeg_request(request: FfmpegRequest) -> str:
     if request.overwrite:
         output = output.overwrite_output()
 
-    if request.progress:
-        output = output.global_args('-progress', 'pipe:1')
+    # Always show FFmpeg output during testing/debugging
+    output = output.global_args('-v', 'info')
 
-    # Run the command
     try:
-        output.run(capture_stdout=True, capture_stderr=True)
+        # Get the FFmpeg command for debugging
+        cmd = ffmpeg.get_args(output)
+        print(f"FFmpeg command: {' '.join(cmd)}")
+        
+        # Run the command
+        stdout, stderr = output.run(capture_stdout=True, capture_stderr=True)
+        return request.output_file
+        
     except ffmpeg.Error as e:
-        error_msg = e.stderr.decode() if e.stderr else str(e)
-        stdout_msg = e.stdout.decode() if e.stdout else ""
-        raise RuntimeError(f"FFmpeg failed:\nSTDERR:\n{error_msg}\nSTDOUT:\n{stdout_msg}")
-
-    return request.output_file
+        error_msg = e.stderr.decode() if e.stderr else "No error output"
+        stdout_msg = e.stdout.decode() if e.stdout else "No stdout output"
+        cmd = ' '.join(ffmpeg.get_args(output))
+        raise RuntimeError(f"FFmpeg failed:\nCommand: {cmd}\nSTDERR:\n{error_msg}\nSTDOUT:\n{stdout_msg}")

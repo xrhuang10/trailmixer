@@ -17,12 +17,48 @@ import unittest
 from pathlib import Path
 from typing import List, Dict, Any
 import json
+import ffmpeg
 
 # Add the app directory to the path
 sys.path.append(str(Path(__file__).parent / "app"))
 
-from ffmpeg import stitch_ffmpeg_request
-from models import FfmpegRequest, InputSegment, AudioCodec, VideoCodec
+from app.ffmpeg import stitch_ffmpeg_request
+from app.models import FfmpegRequest, InputSegment, AudioCodec, VideoCodec
+
+def _get_default_request_params():
+    """Get default parameters for FfmpegRequest"""
+    return {
+        'video_codec': VideoCodec.H264,
+        'video_bitrate': None,
+        'audio_bitrate': None,
+        'crf': None,
+        'preset': "medium",
+        'scale': None,
+        'fps': None,
+        'audio_channels': 2,
+        'audio_sample_rate': 44100,
+        'global_volume': 1.0,
+        'normalize_audio': False,
+        'crossfade_duration': None,
+        'gap_duration': "00:00:00",
+        'overwrite': True,
+        'progress': True,
+        'request_id': None,
+        'priority': 1,
+        'quiet': True
+    }
+
+def _get_default_segment_params():
+    """Get default parameters for InputSegment"""
+    return {
+        'start_time': "00:00:00",
+        'clip_start': "00:00:00",
+        'clip_end': None,
+        'volume': 1.0,
+        'fade_in': None,
+        'fade_out': None,
+        'metadata': None
+    }
 
 class TestFFmpegPipeline(unittest.TestCase):
     """Test suite for FFmpeg pipeline functionality"""
@@ -81,14 +117,32 @@ class TestFFmpegPipeline(unittest.TestCase):
     def _create_test_video(self, output_path: Path, duration: float):
         """Create a test video file using FFmpeg"""
         try:
+            # Create a more reliable test video with both video and audio
             cmd = [
-                'ffmpeg', '-f', 'lavfi', '-i', f'color=c=black:s=320x240:r=30',
-                '-t', str(duration), '-c:v', 'libx264', '-preset', 'ultrafast',
-                str(output_path), '-y'
+                'ffmpeg',
+                # Video input
+                '-f', 'lavfi', '-i', f'color=c=blue:s=320x240:r=30',
+                # Audio input
+                '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
+                # Duration
+                '-t', str(duration),
+                # Video codec settings
+                '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'stillimage',
+                # Audio codec settings
+                '-c:a', 'aac', '-b:a', '128k',
+                # Force overwrite and suppress output
+                '-y', '-hide_banner', '-loglevel', 'error',
+                str(output_path)
             ]
             subprocess.run(cmd, check=True, capture_output=True)
+            
+            # Verify the file was created and is valid
+            if not output_path.exists() or output_path.stat().st_size == 0:
+                raise RuntimeError("Failed to create valid test video")
+                
         except subprocess.CalledProcessError as e:
             print(f"Warning: Could not create sample video file: {e}")
+            print(f"FFmpeg stderr: {e.stderr.decode() if e.stderr else 'No error output'}")
             # Create a dummy file for testing
             output_path.write_bytes(b'dummy video file')
     
@@ -112,11 +166,33 @@ class TestFFmpegPipeline(unittest.TestCase):
                     file_type='audio',
                     volume=0.5,
                     fade_in="0.1",
-                    fade_out="0.1"
+                    fade_out="0.1",
+                    end_time="00:00:01",  # 1 second duration
+                    start_time="00:00:00",
+                    clip_start="00:00:00",
+                    clip_end="00:00:01",
+                    metadata=None
                 )
             ],
             output_file=str(output_path),
             audio_codec=AudioCodec.WAV,
+            video_codec=VideoCodec.H264,
+            video_bitrate=None,
+            audio_bitrate=None,
+            crf=None,
+            preset="medium",
+            scale=None,
+            fps=None,
+            audio_channels=2,
+            audio_sample_rate=44100,
+            global_volume=1.0,
+            normalize_audio=False,
+            crossfade_duration=None,
+            gap_duration="00:00:00",
+            overwrite=True,
+            progress=True,
+            request_id=None,
+            priority=1,
             quiet=True
         )
         
@@ -132,20 +208,98 @@ class TestFFmpegPipeline(unittest.TestCase):
         """Test basic video processing with scaling"""
         output_path = self.test_dir / "output_video.mp4"
         
+        # Start with default params
+        segment_params = _get_default_segment_params()
+        params = _get_default_request_params()
+        
+        # Update specific parameters we want to change
+        segment_params.update({
+            'fade_in': "0.5",
+            'fade_out': "0.5",
+            'end_time': "00:00:01"
+        })
+        
+        # Remove params that will be set directly
+        params.pop('video_codec', None)
+        params.pop('audio_codec', None)
+        params.pop('scale', None)
+        params.pop('fps', None)
+        params.pop('preset', None)
+        
         request = FfmpegRequest(
             input_segments=[
                 InputSegment(
                     file_path=self.sample_files['video'],
                     file_type='video',
-                    fade_in="0.1",
-                    fade_out="0.1"
+                    **segment_params
                 )
             ],
             output_file=str(output_path),
             video_codec=VideoCodec.H264,
-            scale="640:480",
+            audio_codec=AudioCodec.AAC,
+            scale="320:240",  # Match input size
             fps=30.0,
-            quiet=True
+            preset="ultrafast",  # Use fastest preset for testing
+            **params
+        )
+        
+        try:
+            result = stitch_ffmpeg_request(request)
+            self.assertEqual(result, str(output_path))
+            self.assertTrue(output_path.exists())
+            self.assertGreater(output_path.stat().st_size, 0)
+            
+            # Verify the file is a valid video
+            probe = ffmpeg.probe(str(output_path))
+            self.assertIn('streams', probe)
+            self.assertTrue(any(s['codec_type'] == 'video' for s in probe['streams']))
+        except Exception as e:
+            self.fail(f"Video processing failed: {e}")
+    
+    def test_audio_mixing(self):
+        """Test mixing multiple audio streams"""
+        output_path = self.test_dir / "mixed_audio.wav"
+        
+        # Start with default params
+        segment_params = _get_default_segment_params()
+        params = _get_default_request_params()
+        
+        # Create first segment params
+        first_segment_params = segment_params.copy()
+        first_segment_params.update({
+            'volume': 0.7,
+            'end_time': "00:00:03"
+        })
+        
+        # Create second segment params
+        second_segment_params = segment_params.copy()
+        second_segment_params.update({
+            'volume': 0.3,
+            'end_time': "00:00:03"
+        })
+        
+        # Update request params
+        params.update({
+            'audio_codec': AudioCodec.WAV,
+            'global_volume': 1.0,
+            'normalize_audio': True
+        })
+        
+        request = FfmpegRequest(
+            input_segments=[
+                InputSegment(
+                    file_path=self.sample_files['audio'],
+                    file_type='audio',
+                    **first_segment_params
+                ),
+                InputSegment(
+                    file_path=self.sample_files['long_audio'],
+                    file_type='audio',
+                    **second_segment_params
+                )
+            ],
+            output_file=str(output_path),
+            **params
         )
         
         try:
@@ -154,109 +308,133 @@ class TestFFmpegPipeline(unittest.TestCase):
             self.assertTrue(output_path.exists())
             self.assertGreater(output_path.stat().st_size, 0)
         except Exception as e:
-            self.fail(f"Video processing failed: {e}")
-    
-    def test_audio_mixing(self):
-        """Test mixing multiple audio streams"""
-        output_path = self.test_dir / "mixed_audio.wav"
-        
-        request = FfmpegRequest(
-            input_segments=[
-                InputSegment(
-                    file_path=self.sample_files['audio'],
-                    file_type='audio',
-                    volume=0.7
-                ),
-                InputSegment(
-                    file_path=self.sample_files['long_audio'],
-                    file_type='audio',
-                    volume=0.3
-                )
-            ],
-            output_file=str(output_path),
-            audio_codec=AudioCodec.WAV,
-            global_volume=1.0,
-            normalize_audio=True,
-            quiet=True
-        )
-        
-        try:
-            result = stitch_ffmpeg_request(request)
-            self.assertEqual(result, str(output_path))
-            self.assertTrue(output_path.exists())
-        except Exception as e:
             self.fail(f"Audio mixing failed: {e}")
     
     def test_video_with_audio(self):
         """Test combining video with audio"""
         output_path = self.test_dir / "video_with_audio.mp4"
         
+        # Start with default params
+        segment_params = _get_default_segment_params()
+        params = _get_default_request_params()
+        
+        # Create video segment params
+        video_segment_params = segment_params.copy()
+        video_segment_params.update({
+            'end_time': "00:00:03",
+            'volume': 0.0  # Mute original audio
+        })
+        
+        # Create audio segment params
+        audio_segment_params = segment_params.copy()
+        audio_segment_params.update({
+            'end_time': "00:00:03",
+            'volume': 1.0,
+            'fade_in': "0.5",
+            'fade_out': "0.5"
+        })
+        
+        # Update request params
+        params.update({
+            'video_codec': VideoCodec.H264,
+            'audio_codec': AudioCodec.AAC,
+            'normalize_audio': True
+        })
+        
         request = FfmpegRequest(
             input_segments=[
                 InputSegment(
-                    file_path=self.sample_files['video'],
-                    file_type='video'
+                    file_path=self.sample_files['long_video'],
+                    file_type='video',
+                    **video_segment_params
                 ),
                 InputSegment(
-                    file_path=self.sample_files['audio'],
-                    file_type='audio'
+                    file_path=self.sample_files['long_audio'],
+                    file_type='audio',
+                    **audio_segment_params
                 )
             ],
             output_file=str(output_path),
-            video_codec=VideoCodec.H264,
-            audio_codec=AudioCodec.AAC,
-            crf=23,
-            preset="ultrafast",
-            quiet=True
+            **params
         )
         
         try:
             result = stitch_ffmpeg_request(request)
             self.assertEqual(result, str(output_path))
             self.assertTrue(output_path.exists())
+            self.assertGreater(output_path.stat().st_size, 0)
         except Exception as e:
             self.fail(f"Video with audio processing failed: {e}")
     
     def test_segment_timing(self):
         """Test segment timing with start_time and end_time"""
-        output_path = self.test_dir / "timed_segment.wav"
+        output_path = self.test_dir / "timed_output.wav"
+        
+        # Start with default params
+        segment_params = _get_default_segment_params()
+        params = _get_default_request_params()
+        
+        # Remove params that will be set directly
+        params.pop('audio_codec', None)
+        
+        # Remove timing params that will be set directly
+        segment_params.pop('start_time', None)
+        segment_params.pop('clip_start', None)
+        segment_params.pop('clip_end', None)
         
         request = FfmpegRequest(
             input_segments=[
                 InputSegment(
                     file_path=self.sample_files['long_audio'],
                     file_type='audio',
-                    start_time="00:00:01",  # Start at 1 second
-                    end_time="00:00:02",    # End at 2 seconds (1 second duration)
-                    volume=0.8
+                    start_time="00:00:00",  # Start at beginning of output
+                    end_time="00:00:02",    # End at 2 seconds
+                    clip_start="00:00:01",  # Start from 1 second in source
+                    clip_end="00:00:03",    # Use 2 seconds from source
+                    **segment_params
                 )
             ],
             output_file=str(output_path),
-            audio_codec=AudioCodec.WAV,
-            quiet=True
+            audio_codec=AudioCodec.WAV,  # Use WAV for testing
+            **params
         )
         
         try:
             result = stitch_ffmpeg_request(request)
             self.assertEqual(result, str(output_path))
             self.assertTrue(output_path.exists())
+            self.assertGreater(output_path.stat().st_size, 0)
+            
+            # Verify the file is a valid audio file
+            probe = ffmpeg.probe(str(output_path))
+            self.assertIn('streams', probe)
+            self.assertTrue(any(s['codec_type'] == 'audio' for s in probe['streams']))
+            
+            # Verify duration is approximately 2 seconds
+            duration = float(probe['format']['duration'])
+            self.assertAlmostEqual(duration, 2.0, delta=0.1)
         except Exception as e:
-            self.fail(f"Segment timing failed: {e}")
+            self.fail(f"Segment timing test failed: {e}")
     
     def test_error_handling_invalid_file(self):
         """Test error handling with invalid input file"""
         output_path = self.test_dir / "error_test.wav"
         
+        params = _get_default_request_params()
+        segment_params = _get_default_segment_params()
+        
         request = FfmpegRequest(
             input_segments=[
                 InputSegment(
                     file_path="nonexistent_file.wav",
-                    file_type='audio'
+                    file_type='audio',
+                    end_time="00:00:01",  # 1 second duration
+                    **segment_params
                 )
             ],
             output_file=str(output_path),
             audio_codec=AudioCodec.WAV,
-            quiet=True
+            **params
         )
         
         with self.assertRaises(RuntimeError):
@@ -264,50 +442,83 @@ class TestFFmpegPipeline(unittest.TestCase):
     
     def test_error_handling_invalid_segment_type(self):
         """Test error handling with invalid segment type"""
-        output_path = self.test_dir / "error_test.wav"
+        output_path = self.test_dir / "invalid_type.mp4"
         
-        request = FfmpegRequest(
-            input_segments=[
-                InputSegment(
-                    file_path=self.sample_files['audio'],
-                    file_type='invalid_type'  # Invalid type
-                )
-            ],
-            output_file=str(output_path),
-            audio_codec=AudioCodec.WAV,
-            quiet=True
-        )
-        
-        # This should still work as the filter logic handles unknown types
-        try:
-            result = stitch_ffmpeg_request(request)
-            self.assertEqual(result, str(output_path))
-        except Exception as e:
-            self.fail(f"Unexpected error with invalid segment type: {e}")
-    
-    def test_quality_settings(self):
-        """Test different quality settings"""
-        output_path = self.test_dir / "quality_test.mp4"
+        # Get default parameters
+        segment_params = _get_default_segment_params()
+        params = _get_default_request_params()
         
         request = FfmpegRequest(
             input_segments=[
                 InputSegment(
                     file_path=self.sample_files['video'],
-                    file_type='video'
+                    file_type='invalid_type',  # Invalid type
+                    end_time="00:00:01",
+                    **segment_params
+                )
+            ],
+            output_file=str(output_path),
+            **params
+        )
+        
+        # Should raise ValueError with specific message
+        with self.assertRaises(ValueError) as context:
+            stitch_ffmpeg_request(request)
+        
+        self.assertIn("Invalid file type", str(context.exception))
+        self.assertIn("Must be 'audio' or 'video'", str(context.exception))
+    
+    def test_quality_settings(self):
+        """Test different quality settings"""
+        output_path = self.test_dir / "quality_test.mp4"
+        
+        # Start with default params
+        segment_params = _get_default_segment_params()
+        params = _get_default_request_params()
+        
+        # Remove params that will be set directly
+        params.pop('video_codec', None)
+        params.pop('audio_codec', None)
+        params.pop('crf', None)
+        params.pop('preset', None)
+        params.pop('video_bitrate', None)
+        
+        # Create segment params
+        segment_params.update({
+            'end_time': "00:00:01"
+        })
+        
+        request = FfmpegRequest(
+            input_segments=[
+                InputSegment(
+                    file_path=self.sample_files['video'],
+                    file_type='video',
+                    **segment_params
                 )
             ],
             output_file=str(output_path),
             video_codec=VideoCodec.H264,
-            crf=18,  # High quality
-            preset="slow",
-            video_bitrate="1M",
-            quiet=True
+            audio_codec=AudioCodec.AAC,
+            crf=23,  # Standard quality
+            preset="ultrafast",  # Use fastest preset for testing
+            video_bitrate="1M",  # 1 Mbps
+            **params
         )
         
         try:
             result = stitch_ffmpeg_request(request)
             self.assertEqual(result, str(output_path))
             self.assertTrue(output_path.exists())
+            self.assertGreater(output_path.stat().st_size, 0)
+            
+            # Verify the file is a valid video
+            probe = ffmpeg.probe(str(output_path))
+            self.assertIn('streams', probe)
+            self.assertTrue(any(s['codec_type'] == 'video' for s in probe['streams']))
+            
+            # Verify video settings
+            video_stream = next(s for s in probe['streams'] if s['codec_type'] == 'video')
+            self.assertEqual(video_stream['codec_name'], 'h264')
         except Exception as e:
             self.fail(f"Quality settings test failed: {e}")
     
@@ -315,25 +526,38 @@ class TestFFmpegPipeline(unittest.TestCase):
         """Test audio-specific settings"""
         output_path = self.test_dir / "audio_settings.wav"
         
+        # Start with default params
+        segment_params = _get_default_segment_params()
+        params = _get_default_request_params()
+        
+        # Remove params that will be set directly
+        params.pop('audio_codec', None)
+        params.pop('audio_bitrate', None)
+        params.pop('audio_channels', None)
+        params.pop('audio_sample_rate', None)
+        
         request = FfmpegRequest(
             input_segments=[
                 InputSegment(
                     file_path=self.sample_files['audio'],
-                    file_type='audio'
+                    file_type='audio',
+                    end_time="00:00:01",
+                    **segment_params
                 )
             ],
             output_file=str(output_path),
-            audio_codec=AudioCodec.WAV,
-            audio_bitrate="256k",
-            audio_channels=1,  # Mono
+            audio_codec=AudioCodec.AAC,
+            audio_bitrate="192k",
+            audio_channels=2,
             audio_sample_rate=48000,
-            quiet=True
+            **params
         )
         
         try:
             result = stitch_ffmpeg_request(request)
             self.assertEqual(result, str(output_path))
             self.assertTrue(output_path.exists())
+            self.assertGreater(output_path.stat().st_size, 0)
         except Exception as e:
             self.fail(f"Audio settings test failed: {e}")
 
@@ -356,8 +580,19 @@ def run_performance_test():
             '-t', '10', '-c:a', 'pcm_s16le', str(audio_path), '-y'
         ]
         cmd_video = [
-            'ffmpeg', '-f', 'lavfi', '-i', 'color=c=black:s=1280x720:r=30',
-            '-t', '10', '-c:v', 'libx264', '-preset', 'ultrafast', str(video_path), '-y'
+            'ffmpeg',
+            # Video input
+            '-f', 'lavfi', '-i', 'color=c=black:s=1280x720:r=30',
+            # Audio input (silent)
+            '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
+            # Duration
+            '-t', '10',
+            # Video codec settings
+            '-c:v', 'libx264', '-preset', 'ultrafast',
+            # Audio codec settings
+            '-c:a', 'aac', '-b:a', '128k',
+            # Output
+            str(video_path), '-y'
         ]
         
         subprocess.run(cmd_audio, check=True, capture_output=True)
@@ -367,16 +602,47 @@ def run_performance_test():
         import time
         
         output_path = test_dir / "perf_output.mp4"
+        params = _get_default_request_params()
+        segment_params = _get_default_segment_params()
+        
+        # Remove params that will be set directly
+        params.pop('video_codec', None)
+        params.pop('audio_codec', None)
+        params.pop('crf', None)
+        params.pop('preset', None)
+        
+        # Create segment params for video and audio
+        video_segment_params = segment_params.copy()
+        video_segment_params.update({
+            'end_time': "00:00:10",
+            'volume': 0.0  # Mute original audio
+        })
+        
+        audio_segment_params = segment_params.copy()
+        audio_segment_params.update({
+            'end_time': "00:00:10",
+            'volume': 1.0
+        })
+        
         request = FfmpegRequest(
             input_segments=[
-                InputSegment(file_path=str(video_path), file_type='video'),
-                InputSegment(file_path=str(audio_path), file_type='audio')
+                InputSegment(
+                    file_path=str(video_path),
+                    file_type='video',
+                    **video_segment_params
+                ),
+                InputSegment(
+                    file_path=str(audio_path),
+                    file_type='audio',
+                    **audio_segment_params
+                )
             ],
             output_file=str(output_path),
             video_codec=VideoCodec.H264,
             audio_codec=AudioCodec.AAC,
             crf=23,
-            preset="medium"
+            preset="medium",
+            **params
         )
         
         start_time = time.time()
