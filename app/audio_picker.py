@@ -1,14 +1,8 @@
 """
 Audio selection logic for video sentiment analysis
 """
-from fileinput import filename
 import os
-import random
-from typing import Optional, List, Dict
-from models import (
-    VideoSegment, AudioLibrary, AudioSelection, VideoSegmentWithAudio, 
-    SentimentAnalysisData
-)
+import json
 
 def map_sentiment_to_filename(sentiment: str) -> str:
     """
@@ -67,9 +61,6 @@ def get_music_file_paths(analysis_file_path: str) -> list[str]:
 if __name__ == "__main__":
     import json
     from models import SentimentAnalysisData
-    
-    print("🧪 Testing Audio Picker Logic")
-    print("=" * 50)
     
     # Load test data from llm_answers directory
     test_file = "./llm_answers/20250719_142310_687b0d7d61acc75954400474.json"

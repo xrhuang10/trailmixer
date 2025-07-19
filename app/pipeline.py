@@ -1,6 +1,7 @@
 """
 Background processing pipelines for video processing
 """
+import re
 import os
 from typing import Dict
 from models import (
@@ -12,6 +13,7 @@ from video_processor import analyze_sentiment_with_twelvelabs, process_video_seg
 from ffmpeg_builder import create_multi_video_ffmpeg_request
 from prompts.extract_info import extract_info_prompt
 from twelvelabs_client import upload_video_to_twelvelabs
+from audio_picker import get_music_file_paths
 
 def process_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
     """Complete video processing pipeline"""
@@ -51,48 +53,29 @@ def process_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
             raise RuntimeError(f"Sentiment analysis failed for '{filename}': {sentiment_result.error_message}")
         
         # Step 3: Select background audio based on sentiment analysis
-        job.status = JobStatus.PROCESSING
-        job.message = f"Selecting background music for '{filename}' based on video sentiment..."
         print(f"🎵 Step 3: Selecting background music tracks for '{filename}' based on AI analysis...")
+        if job.sentiment_analysis.file_path:
+            filepath = re.sub(r'\\+', '/', job.sentiment_analysis.file_path)
+            print(f"File path: {filepath}")
+            music_file_paths = get_music_file_paths(filepath)
+            print(f"🎵 Found {len(music_file_paths)} music file paths")
+        else:
+            print("❌ No sentiment analysis file path available for music selection")
         
-        if isinstance(sentiment_result.sentiment_analysis, SentimentAnalysisData):
-            sentiment_data = sentiment_result.sentiment_analysis
-            print(f"📊 Video analysis complete:")
-            print(f"   🎬 Title: '{sentiment_data.video_title}'")
-            print(f"   ⏱️ Duration: {sentiment_data.video_length}s")
-            print(f"   🎭 Overall mood: {sentiment_data.overall_mood}")
-            print(f"   📋 Segments: {len(sentiment_data.segments)}")
-            
-            # Create audio picking request
-            output_path = f'../processed_videos/{job_id}_processed.mp4'
-            output_filename = os.path.basename(output_path)
-            
-            # Process video segments with audio selection
-            processing_request = VideoProcessingRequest(
-                file_path=file_path,
-                sentiment_data=sentiment_data,
-                output_path=output_path,
-                job_id=job_id
-            )
-            
-            print(f"🎬 Step 4: Processing video segments for '{filename}'...")
-            processed_result = process_video_segments(processing_request)
-            
-            # Add processed result to job status
-            if processed_result.success:
-                processed_data = processed_result.dict()
-                job.processed_video = processed_data
-                print(f"✅ Video processing successful! Output: {output_filename}")
+        # Testing if the music file paths are valid
+        all_exist = True
+        for path in music_file_paths:
+            if not os.path.isfile(path):
+                print(f"❌ File does not exist: {path}")
+                all_exist = False
             else:
-                job.processed_video = processed_result.dict()
-                raise RuntimeError(f"Video processing failed for '{filename}': {processed_result.error_message}")
-        
-        # Step 4: Complete
-        job.status = JobStatus.COMPLETED
-        job.message = f"Video processing completed successfully for '{filename}' with background music"
-        print(f"🎉 Pipeline completed successfully for '{filename}'!")
-        print(f"   🆔 Job ID: {job_id}")
-        print(f"   📁 Output ready for download/streaming")
+                print(f"✅ File exists: {path}")
+        if all_exist:
+            print("All music file paths are valid.")
+        else:
+            print("Some music file paths are invalid.")
+            
+        print("Step 3 complete!")
         
     except Exception as e:
         job.status = JobStatus.FAILED
@@ -192,3 +175,9 @@ def process_multi_video_pipeline(job_id: str, multi_video_job_status: Dict[str, 
         job.status = JobStatus.FAILED
         job.message = f"Multi-video processing failed: {str(e)}"
         print(f"❌ Multi-video pipeline failed (Job: {job_id}): {str(e)}") 
+
+if __name__ == "__main__":
+    if not os.path.exists('app/llm_answers/20250719_153005_687bf1db2b144dc12e0316fa.json'):
+        print('NOPE')
+    else:
+        print('OK')

@@ -8,13 +8,13 @@ from typing import List
 from models import (
     VideoSegment, SentimentAnalysisData, SentimentAnalysisRequest, SentimentAnalysisResponse,
     VideoProcessingRequest, VideoProcessingResult, AudioPickingRequest, AudioLibrary,
-    VideoAnalysisResult
+    VideoAnalysisResult, AudioSelection, VideoSegmentWithAudio
 )
 
 # Import Twelve Labs functions
 from twelvelabs_client import upload_video_to_twelvelabs, prompt_twelvelabs, clean_llm_string_output_to_json, export_to_json_file
 from prompts.extract_info import extract_info_prompt
-from audio_picker import pick_audio
+from audio_picker import map_sentiment_to_filename, get_music_file_paths
 from ffmpeg_builder import create_ffmpeg_request, seconds_to_time_format
 
 def extract_segments(file_path: str) -> List[VideoSegment]:
@@ -129,9 +129,103 @@ def process_video_segments(request: VideoProcessingRequest) -> VideoProcessingRe
             crossfade_duration="1.0"  # 1 second crossfade between segments
         )
         
-        # Use extracted audio picker logic for Step 3
-        from audio_processor_core import process_audio_for_pipeline_step3
-        segments_with_audio = process_audio_for_pipeline_step3(audio_request.sentiment_data, audio_request.global_volume)
+        # Step 3: Audio selection using audio_picker logic
+        print(f"🎵 Step 3: Starting audio selection for '{request.sentiment_data.video_title}'...")
+        segments_with_audio = []
+        
+        # Validate music data using audio_picker logic
+        music_data = getattr(audio_request.sentiment_data, 'music', None)
+        if not music_data or not hasattr(music_data, 'tracks') or not music_data.tracks:
+            print("❌ No music tracks found in sentiment data")
+        else:
+            tracks = music_data.tracks
+            print(f"🎼 Found {len(tracks)} music track(s) to process")
+            
+            # Process each music track using audio_picker functions
+            for i, track in enumerate(tracks):
+                track_dict = track.dict() if hasattr(track, 'dict') else track
+                
+                start_time = track_dict.get('start', 0)
+                end_time = track_dict.get('end', 60)
+                style = track_dict.get('style', 'Pop')
+                sentiment = track_dict.get('sentiment', 'calm')
+                intensity = track_dict.get('intensity', 'medium')
+                
+                track_duration = end_time - start_time
+                print(f"🎼 Processing track {i+1}/{len(tracks)}: '{sentiment}' ({style}, {intensity})")
+                print(f"   ⏱️ Timing: {start_time}s - {end_time}s (duration: {track_duration:.1f}s)")
+                
+                # Map sentiment to filename using audio_picker function
+                filename = map_sentiment_to_filename(sentiment)
+                
+                # Create file path based on style and sentiment
+                style_lower = style.lower()
+                style_mappings = {
+                    'pop': 'pop',
+                    'hip hop': 'hiphop',
+                    'hiphop': 'hiphop',
+                    'classical': 'classical',
+                    'electronic': 'pop',  # Fallback
+                    'meme': 'pop'  # Fallback
+                }
+                style_dir = style_mappings.get(style_lower, 'pop')
+                music_file_path = os.path.join('..', 'music', style_dir, f'{filename}.mp3')
+                
+                # Check if file exists
+                if os.path.exists(music_file_path):
+                    # Determine volume based on intensity
+                    intensity_lower = intensity.lower()
+                    if intensity_lower == 'high':
+                        volume = 0.5 * audio_request.global_volume
+                        fade_duration = "0.2"
+                    elif intensity_lower == 'medium':
+                        volume = 0.3 * audio_request.global_volume
+                        fade_duration = "0.5"
+                    else:  # low
+                        volume = 0.2 * audio_request.global_volume
+                        fade_duration = "1.0"
+                    
+                    # Create audio selection
+                    audio_selection = AudioSelection(
+                        audio_file=music_file_path,
+                        volume=volume,
+                        fade_in=fade_duration,
+                        fade_out=fade_duration
+                    )
+                    
+                    # Create video segment with audio
+                    segment_with_audio = VideoSegmentWithAudio(
+                        start_time=start_time,
+                        end_time=end_time,
+                        sentiment=sentiment,
+                        music_style=style,
+                        intensity=intensity,
+                        audio_selection=audio_selection
+                    )
+                    
+                    segments_with_audio.append(segment_with_audio)
+                    
+                    selected_filename = os.path.basename(music_file_path)
+                    print(f"   ✅ Assigned: {selected_filename} | Volume: {volume:.3f}")
+                else:
+                    print(f"   ❌ Music file not found: {music_file_path}")
+            
+            # Log chosen tracks summary
+            if segments_with_audio:
+                print(f"\n🎼 STEP 3 RESULTS - CHOSEN TRACKS:")
+                print(f"{'='*55}")
+                for i, segment in enumerate(segments_with_audio):
+                    audio_filename = os.path.basename(segment.audio_selection.audio_file)
+                    duration = segment.end_time - segment.start_time
+                    print(f"✓ Track {i+1}: {audio_filename}")
+                    print(f"  📍 {segment.start_time}s→{segment.end_time}s ({duration:.1f}s) | {segment.music_style}/{segment.sentiment}")
+                    print(f"  🔊 Vol: {segment.audio_selection.volume:.3f} | Intensity: {segment.intensity}")
+                    print(f"  📁 File: {segment.audio_selection.audio_file}")
+                
+                total_audio_time = sum(seg.end_time - seg.start_time for seg in segments_with_audio)
+                coverage_percentage = (total_audio_time / audio_request.sentiment_data.video_length) * 100 if audio_request.sentiment_data.video_length > 0 else 0
+                print(f"📊 Total background music: {total_audio_time:.1f}s of {audio_request.sentiment_data.video_length}s video ({coverage_percentage:.1f}%)")
+                print(f"{'='*55}")
         
         print(f"✅ Step 3 Complete: Audio selection finished for '{request.sentiment_data.video_title}'!")
         print(f"📊 Generated {len(segments_with_audio)} audio segments for background music")
@@ -220,14 +314,66 @@ def process_single_video_in_batch(video_result: VideoAnalysisResult, audio_libra
             
             print(f"🎵 Step 3: Selecting background music tracks for '{video_result.filename}' | Duration: {sentiment_data.video_length}s")
             
-            # Use extracted audio processor logic for multi-video pipeline
-            from audio_processor_core import process_tracks_and_create_audio_segments, log_pipeline_step3_results
-            segments_with_audio = process_tracks_and_create_audio_segments(sentiment_data, global_volume=0.3)
-            video_result.segments_with_audio = segments_with_audio
+            # Audio selection using audio_picker logic for multi-video pipeline
+            segments_with_audio = []
+            music_data = getattr(sentiment_data, 'music', None)
+            if not music_data or not hasattr(music_data, 'tracks') or not music_data.tracks:
+                print("❌ No music tracks found in sentiment data")
+            else:
+                tracks = music_data.tracks
+                for i, track in enumerate(tracks):
+                    track_dict = track.dict() if hasattr(track, 'dict') else track
+                    
+                    start_time = track_dict.get('start', 0)
+                    end_time = track_dict.get('end', 60)
+                    style = track_dict.get('style', 'Pop')
+                    sentiment = track_dict.get('sentiment', 'calm')
+                    intensity = track_dict.get('intensity', 'medium')
+                    
+                    # Map sentiment to filename using audio_picker function
+                    filename = map_sentiment_to_filename(sentiment)
+                    
+                    # Create file path
+                    style_lower = style.lower()
+                    style_mappings = {'pop': 'pop', 'hip hop': 'hiphop', 'hiphop': 'hiphop', 'classical': 'classical', 'electronic': 'pop', 'meme': 'pop'}
+                    style_dir = style_mappings.get(style_lower, 'pop')
+                    music_file_path = os.path.join('..', 'music', style_dir, f'{filename}.mp3')
+                    
+                    if os.path.exists(music_file_path):
+                        # Determine volume based on intensity
+                        intensity_lower = intensity.lower()
+                        if intensity_lower == 'high':
+                            volume = 0.5 * 0.3  # global_volume=0.3
+                            fade_duration = "0.2"
+                        elif intensity_lower == 'medium':
+                            volume = 0.3 * 0.3
+                            fade_duration = "0.5"
+                        else:  # low
+                            volume = 0.2 * 0.3
+                            fade_duration = "1.0"
+                        
+                        audio_selection = AudioSelection(
+                            audio_file=music_file_path,
+                            volume=volume,
+                            fade_in=fade_duration,
+                            fade_out=fade_duration
+                        )
+                        
+                        segment_with_audio = VideoSegmentWithAudio(
+                            start_time=start_time,
+                            end_time=end_time,
+                            sentiment=sentiment,
+                            music_style=style,
+                            intensity=intensity,
+                            audio_selection=audio_selection
+                        )
+                        
+                        segments_with_audio.append(segment_with_audio)
             
+            video_result.segments_with_audio = segments_with_audio
             print(f"✅ Audio track selection complete for '{video_result.filename}' | Selected music for {len(segments_with_audio)} segments")
             
-            # Use extracted logging for this video in multi-video pipeline
+            # Log chosen tracks for this video in multi-video pipeline
             print(f"🎼 CHOSEN TRACKS for '{video_result.filename}':")
             if segments_with_audio:
                 for i, segment in enumerate(segments_with_audio):
