@@ -4,6 +4,7 @@ from typing import Optional
 from dotenv import load_dotenv
 
 from twelvelabs import TwelveLabs
+from twelvelabs.models import GenerateOpenEndedTextResult
 from twelvelabs.models.task import Task
 
 load_dotenv()
@@ -58,7 +59,31 @@ def upload_video_to_twelvelabs(file_path: str) -> Optional[str]:
     except Exception as e:
         print(f"Error uploading to Twelve Labs: {str(e)}")
         raise e
+    
+def prompt_twelvelabs(video_id: str, prompt: str) -> Optional[GenerateOpenEndedTextResult]:
+    """
+    Prompt Twelve Labs for a video.
+    
+    Args:
+        video_id: The ID of the video to prompt
+        prompt: The prompt to send to Twelve Labs
+        
+    Returns:
+        The response from Twelve Labs
+    """
+    try:
+        print(f"Prompting Twelve Labs with video ID: {video_id} ")
+        response = twelve_labs_client.analyze(
+            video_id=video_id,
+            prompt=prompt
+        )
+        print(f"Prompting ended")
+        return response
+    except Exception as e:
+        print(f"Error prompting Twelve Labs: {str(e)}")
+        raise e
 
 # For testing
 if __name__ == "__main__":
-    upload_video_to_twelvelabs("..\\files\\speed.mp4", "test.mp4")
+    # upload_video_to_twelvelabs("..\\files\\speed.mp4")
+    print(prompt_twelvelabs("687b0e4861acc759544004a1", "What is going on in this video?"))
