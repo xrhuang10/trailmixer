@@ -1,0 +1,162 @@
+{
+  "video_id": "hack_the_6ix",
+  "video_title": "Hackathon Event Highlights",
+  "video_description": "A compilation of various activities at a hackathon event.",
+  "video_length": 141,
+  "overall_mood": "Energetic",
+  "segments": [
+    {
+      "start_time": 0,
+      "end_time": 7,
+      "sentiment": "Exciting",
+      "music_style": "Pop",
+      "intensity": "High",
+      "include": true
+    },
+    {
+      "start_time": 11,
+      "end_time": 14,
+      "sentiment": "Calm",
+      "music_style": "Pop",
+      "intensity": "Low",
+      "include": true
+    },
+    {
+      "start_time": 14,
+      "end_time": 19,
+      "sentiment": "Energetic",
+      "music_style": "Pop",
+      "intensity": "Medium",
+      "include": true
+    },
+    {
+      "start_time": 28,
+      "end_time": 31,
+      "sentiment": "Focused",
+      "music_style": "Pop",
+      "intensity": "Low",
+      "include": true
+    },
+    {
+      "start_time": 34,
+      "end_time": 37,
+      "sentiment": "Engaged",
+      "music_style": "Pop",
+      "intensity": "Medium",
+      "include": true
+    },
+    {
+      "start_time": 40,
+      "end_time": 43,
+      "sentiment": "Collaborative",
+      "music_style": "Pop",
+      "intensity": "Low",
+      "include": true
+    },
+    {
+      "start_time": 58,
+      "end_time": 62,
+      "sentiment": "Fun",
+      "music_style": "Pop",
+      "intensity": "High",
+      "include": true
+    },
+    {
+      "start_time": 62,
+      "end_time": 67,
+      "sentiment": "Teamwork",
+      "music_style": "Pop",
+      "intensity": "Medium",
+      "include": true
+    },
+    {
+      "start_time": 72,
+      "end_time": 74,
+      "sentiment": "Competitive",
+      "music_style": "Pop",
+      "intensity": "High",
+      "include": true
+    },
+    {
+      "start_time": 87,
+      "end_time": 90,
+      "sentiment": "Informative",
+      "music_style": "Pop",
+      "intensity": "Low",
+      "include": true
+    },
+    {
+      "start_time": 95,
+      "end_time": 99,
+      "sentiment": "Innovative",
+      "music_style": "Pop",
+      "intensity": "Medium",
+      "include": true
+    },
+    {
+      "start_time": 105,
+      "end_time": 108,
+      "sentiment": "Celebratory",
+      "music_style": "Pop",
+      "intensity": "High",
+      "include": true
+    },
+    {
+      "start_time": 115,
+      "end_time": 118,
+      "sentiment": "Achievement",
+      "music_style": "Pop",
+      "intensity": "Medium",
+      "include": true
+    },
+    {
+      "start_time": 126,
+      "end_time": 129,
+      "sentiment": "Recognition",
+      "music_style": "Pop",
+      "intensity": "Low",
+      "include": true
+    },
+    {
+      "start_time": 132,
+      "end_time": 135,
+      "sentiment": "Community",
+      "music_style": "Pop",
+      "intensity": "Medium",
+      "include": true
+    },
+    {
+      "start_time": 136,
+      "end_time": 139,
+      "sentiment": "Unity",
+      "music_style": "Pop",
+      "intensity": "Low",
+      "include": true
+    }
+  ],
+  "music": {
+    "tracks": [
+      {
+        "start": 0,
+        "end": 21,
+        "style": "Pop",
+        "intensity": "High",
+        "sentiment": "Energetic"
+      },
+      {
+        "start": 21,
+        "end": 42,
+        "style": "Pop",
+        "intensity": "Medium",
+        "sentiment": "Focused"
+      },
+      {
+        "start": 42,
+        "end": 60,
+        "style": "Pop",
+        "intensity": "Low",
+        "sentiment": "Celebratory"
+      }
+    ]
+  }
+}
