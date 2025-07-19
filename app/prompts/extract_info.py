@@ -1,6 +1,6 @@
 import json
 
-with open("prompts/twelvelabs_output_schema.json", "r") as f:
+with open("app/prompts/twelvelabs_output_schema.json", "r") as f:
     twelvelabs_output_schema = json.load(f)
 
 desired_length = 60  # in seconds
