@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Dict, Any, Union
 from enum import Enum
 from datetime import datetime
+from fastapi import UploadFile
 
 # === Twelve Labs Response Models ===
 class TwelveLabsResponse(BaseModel):
