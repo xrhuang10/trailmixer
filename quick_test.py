@@ -91,12 +91,22 @@ def create_test_files(test_dir):
         print(f"⚠️  Could not create test audio file")
         return None
     
-    # Create a simple video file (1 second of black video)
+    # Create a simple video file (1 second of black video with silent audio)
     video_path = test_dir / "test_video.mp4"
     try:
         cmd = [
-            'ffmpeg', '-f', 'lavfi', '-i', 'color=c=black:s=320x240:r=30',
-            '-t', '1', '-c:v', 'libx264', '-preset', 'ultrafast',
+            'ffmpeg',
+            # Video input
+            '-f', 'lavfi', '-i', 'color=c=black:s=320x240:r=30',
+            # Audio input
+            '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
+            # Duration
+            '-t', '1',
+            # Video codec settings
+            '-c:v', 'libx264', '-preset', 'ultrafast',
+            # Audio codec settings
+            '-c:a', 'aac', '-b:a', '128k',
+            # Output
             str(video_path), '-y', '-loglevel', 'error'
         ]
         subprocess.run(cmd, check=True, capture_output=True)
@@ -269,11 +279,11 @@ def test_video_processing(test_files, args):
         return False
 
 def test_combined_processing(test_files, args):
-    """Test combining video and audio"""
+    """Test combining video with audio"""
     print("\n🎭 Testing video + audio processing...")
     
-    if not test_files or 'video' not in test_files:
-        print("⚠️  Skipping combined test - missing video file")
+    if not test_files or 'video' not in test_files or 'audio' not in test_files:
+        print("⚠️  Skipping combined test - missing test files")
         return False
     
     try:
@@ -282,49 +292,42 @@ def test_combined_processing(test_files, args):
         
         output_path = Path(test_files['video']).parent / "output_combined.mp4"
         
-        # Start with video segment (includes original audio)
-        input_segments = [
-            InputSegment(
-                file_path=test_files['video'],
-                file_type='video',
-                start_time=args.video_start,
-                end_time=args.video_end,
-                clip_start=args.video_clip_start,
-                clip_end=args.video_clip_end,
-                volume=args.video_volume,  # Control video's audio volume
-                fade_in=None,
-                fade_out=None,
-                metadata=None
-            )
-        ]
+        # Create video segment with muted audio
+        video_segment = InputSegment(
+            file_path=test_files['video'],
+            file_type='video',
+            start_time=args.video_start,
+            end_time=args.video_end,
+            clip_start=args.video_clip_start,
+            clip_end=args.video_clip_end,
+            volume=0.0,  # Mute original audio
+            fade_in=None,
+            fade_out=None,
+            metadata=None
+        )
         
-        # Add audio file if provided
-        if 'audio' in test_files:
-            input_segments.append(
-                InputSegment(
-                    file_path=test_files['audio'],
-                    file_type='audio',
-                    # When to place in output timeline
-                    start_time=args.audio_start,
-                    end_time=args.audio_end,
-                    # Which part of audio file to use
-                    clip_start=args.audio_clip_start,
-                    clip_end=args.audio_clip_end,
-                    volume=args.audio_volume,  # Control added audio volume
-                    fade_in="0.5",  # Add slight fade for smooth transition
-                    fade_out="0.5",
-                    metadata=None
-                )
-            )
+        # Create audio segment
+        audio_segment = InputSegment(
+            file_path=test_files['audio'],
+            file_type='audio',
+            start_time=args.audio_start,
+            end_time=args.audio_end,
+            clip_start=args.audio_clip_start,
+            clip_end=args.audio_clip_end,
+            volume=args.audio_volume,
+            fade_in="0.5",
+            fade_out="0.5",
+            metadata=None
+        )
         
         request = FfmpegRequest(
-            input_segments=input_segments,
+            input_segments=[video_segment, audio_segment],
             output_file=str(output_path),
             video_codec=VideoCodec.H264,
             audio_codec=AudioCodec.AAC,
-            quiet=False,
+            audio_bitrate="192k",
+            quiet=False,  # Keep FFmpeg output visible
             video_bitrate=None,
-            audio_bitrate="192k",  # Higher quality for mixed audio
             crf=None,
             preset="medium",
             scale=None,
@@ -332,7 +335,7 @@ def test_combined_processing(test_files, args):
             audio_channels=2,
             audio_sample_rate=44100,
             global_volume=1.0,
-            normalize_audio=True,  # Normalize the final mix
+            normalize_audio=True,  # Normalize final audio
             crossfade_duration=None,
             gap_duration="00:00:00",
             overwrite=True,
