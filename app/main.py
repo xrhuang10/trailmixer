@@ -18,7 +18,8 @@ from models import (
     JobStatus, JobInfo, VideoProcessingRequest, VideoProcessingResult,
     VideoUploadResponse, JobStatusResponse, SentimentResultResponse, ProcessedVideoResponse, JobListResponse,
     AudioLibrary, AudioSelection, VideoSegmentWithAudio, EnhancedSentimentAnalysisData, AudioPickingRequest,
-    FfmpegRequest, InputSegment, VideoCodec, AudioCodec
+    FfmpegRequest, InputSegment, VideoCodec, AudioCodec,
+    MultiVideoUploadResponse, VideoAnalysisResult, MultiVideoJobInfo, MultiVideoFFmpegRequest
 )
 
 app = FastAPI(title="TrailMixer Video Processing API")
@@ -28,6 +29,7 @@ app.mount("/static", StaticFiles(directory="../processed_videos"), name="static"
 
 # In-memory storage for job status (in production, use Redis or database)
 job_status: Dict[str, JobInfo] = {}
+multi_video_job_status: Dict[str, MultiVideoJobInfo] = {}
 
 # Helper function to convert seconds to HH:MM:SS format
 def seconds_to_time_format(seconds: float) -> str:
@@ -202,6 +204,218 @@ def create_ffmpeg_request(
     print(f"📁 Output will be saved to: {output_video_path}")
     
     return ffmpeg_request
+
+def create_multi_video_ffmpeg_request(request: MultiVideoFFmpegRequest) -> FfmpegRequest:
+    """
+    Create FFmpeg request from multiple videos with their audio selections
+    Videos will be concatenated in sequence with their respective background music
+    """
+    print(f"🎬 Creating multi-video FFmpeg request for {len(request.video_results)} videos")
+    
+    input_segments = []
+    current_time_offset = 0.0
+    
+    for video_idx, video_result in enumerate(request.video_results):
+        if not video_result.success or not video_result.sentiment_analysis:
+            print(f"⚠️ Skipping video {video_idx + 1} due to processing errors")
+            continue
+        
+        sentiment_data = video_result.sentiment_analysis.sentiment_analysis
+        if not isinstance(sentiment_data, SentimentAnalysisData):
+            print(f"⚠️ Skipping video {video_idx + 1} due to invalid sentiment data")
+            continue
+        
+        video_length = video_result.video_length or sentiment_data.video_length
+        
+        print(f"📹 Adding video {video_idx + 1}: {video_result.filename} (duration: {video_length}s)")
+        
+        # Add video segment with time offset
+        video_segment = InputSegment(
+            file_path=video_result.file_path,
+            file_type="video",
+            start_time=seconds_to_time_format(current_time_offset),
+            end_time=seconds_to_time_format(current_time_offset + video_length),
+            clip_start="00:00:00",
+            clip_end=None,
+            volume=1.0,
+            fade_in=None,
+            fade_out=None,
+            metadata={
+                "type": "video_segment",
+                "video_index": video_idx,
+                "original_filename": video_result.filename
+            }
+        )
+        input_segments.append(video_segment)
+        
+        # Add audio segments for this video with time offset
+        if video_result.segments_with_audio:
+            for audio_segment in video_result.segments_with_audio:
+                if audio_segment.audio_selection:
+                    audio_input = InputSegment(
+                        file_path=audio_segment.audio_selection.audio_file,
+                        file_type="audio",
+                        start_time=seconds_to_time_format(current_time_offset + audio_segment.start_time),
+                        end_time=seconds_to_time_format(current_time_offset + audio_segment.end_time),
+                        clip_start="00:00:00",
+                        clip_end=None,
+                        volume=audio_segment.audio_selection.volume * request.global_volume,
+                        fade_in=audio_segment.audio_selection.fade_in,
+                        fade_out=audio_segment.audio_selection.fade_out,
+                        metadata={
+                            "type": "background_music",
+                            "video_index": video_idx,
+                            "segment_sentiment": audio_segment.sentiment,
+                            "music_style": audio_segment.music_style,
+                            "intensity": audio_segment.intensity
+                        }
+                    )
+                    input_segments.append(audio_input)
+                    
+                    print(f"🎵 Added audio for video {video_idx + 1}: {audio_segment.audio_selection.audio_file}")
+        
+        # Update time offset for next video (add transition time)
+        current_time_offset += video_length + float(request.video_transition_duration)
+    
+    # Create the aggregated FFmpeg request
+    ffmpeg_request = FfmpegRequest(
+        input_segments=input_segments,
+        output_file=request.output_video_path,
+        video_codec=VideoCodec.H264,
+        audio_codec=AudioCodec.AAC,
+        video_bitrate=None,
+        audio_bitrate=None,
+        crf=23,
+        preset="medium",
+        scale=None,
+        fps=None,
+        audio_channels=2,
+        audio_sample_rate=44100,
+        global_volume=1.0,
+        normalize_audio=True,
+        crossfade_duration=request.crossfade_duration,
+        gap_duration=request.video_transition_duration,
+        overwrite=True,
+        quiet=False,
+        progress=True,
+        request_id=str(uuid.uuid4()),
+        priority=5
+    )
+    
+    total_duration = current_time_offset - float(request.video_transition_duration)
+    print(f"✅ Created multi-video FFmpeg request:")
+    print(f"   📊 Total segments: {len(input_segments)}")
+    print(f"   🎬 Videos: {len(request.video_results)}")
+    print(f"   ⏱️ Total duration: {total_duration:.1f}s")
+    print(f"   📁 Output: {request.output_video_path}")
+    
+    return ffmpeg_request
+
+def process_single_video_in_batch(video_result: VideoAnalysisResult, audio_library: AudioLibrary) -> VideoAnalysisResult:
+    """
+    Process a single video within a multi-video batch
+    Returns updated VideoAnalysisResult with sentiment analysis and audio selection
+    """
+    try:
+        print(f"🎯 Processing video {video_result.video_index + 1}: {video_result.filename}")
+        
+        # Step 1: Upload to Twelve Labs
+        video_id = upload_video_to_twelvelabs(video_result.file_path)
+        if not video_id:
+            raise RuntimeError("Failed to upload video to Twelve Labs")
+        
+        video_result.twelve_labs_video_id = video_id
+        print(f"✅ Uploaded to Twelve Labs with ID: {video_id}")
+        
+        # Step 2: Sentiment analysis
+        sentiment_request = SentimentAnalysisRequest(video_id=video_id, prompt=extract_info_prompt)
+        sentiment_result = analyze_sentiment_with_twelvelabs(sentiment_request)
+        
+        if not sentiment_result.success:
+            raise RuntimeError(f"Sentiment analysis failed: {sentiment_result.error_message}")
+        
+        video_result.sentiment_analysis = sentiment_result
+        
+        # Step 3: Audio selection
+        if isinstance(sentiment_result.sentiment_analysis, SentimentAnalysisData):
+            sentiment_data = sentiment_result.sentiment_analysis
+            video_result.video_length = sentiment_data.video_length
+            
+            segments_with_audio = pick_audio(sentiment_data, audio_library)
+            video_result.segments_with_audio = segments_with_audio
+            
+            print(f"🎵 Selected audio for {len(segments_with_audio)} segments")
+        
+        video_result.success = True
+        return video_result
+        
+    except Exception as e:
+        print(f"❌ Error processing video {video_result.video_index + 1}: {str(e)}")
+        video_result.success = False
+        video_result.error_message = str(e)
+        return video_result
+
+# Background processing function for multiple videos
+def process_multi_video_pipeline(job_id: str):
+    """Complete multi-video processing pipeline"""
+    try:
+        job = multi_video_job_status[job_id]
+        
+        # Step 1: Process each video individually
+        job.status = JobStatus.INDEXING
+        job.message = f"Processing {job.video_count} videos - indexing and analyzing..."
+        
+        audio_library = AudioLibrary()
+        
+        for i, video_file in enumerate(job.video_files):
+            job.message = f"Processing video {i+1}/{job.video_count}: indexing and analyzing..."
+            
+            # Create video result entry
+            video_result = VideoAnalysisResult(
+                video_index=i,
+                filename=video_file,
+                file_path=os.path.join("uploads", f"{job_id}_{video_file}"),
+                twelve_labs_video_id=None,
+                sentiment_analysis=None,
+                segments_with_audio=None,
+                video_length=None,
+                success=False,
+                error_message=None
+            )
+            
+            # Process this video
+            processed_result = process_single_video_in_batch(video_result, audio_library)
+            job.video_results.append(processed_result)
+        
+        # Step 2: Aggregate all videos into single FFmpeg request
+        job.status = JobStatus.PROCESSING
+        job.message = "Creating aggregated video with background music..."
+        
+        output_path = f'../processed_videos/{job_id}_multi_video.mp4'
+        
+        multi_video_request = MultiVideoFFmpegRequest(
+            video_results=job.video_results,
+            output_video_path=output_path,
+            global_volume=0.3,
+            crossfade_duration="1.0",
+            video_transition_duration="0.5"
+        )
+        
+        aggregated_ffmpeg_request = create_multi_video_ffmpeg_request(multi_video_request)
+        job.aggregated_ffmpeg_request = aggregated_ffmpeg_request.dict()
+        
+        # TODO: Execute the aggregated FFmpeg request
+        print(f"🎬 Multi-video FFmpeg request ready for execution!")
+        print(f"   Total input segments: {len(aggregated_ffmpeg_request.input_segments)}")
+        
+        # Step 3: Complete
+        job.status = JobStatus.COMPLETED
+        job.message = f"Multi-video processing completed - {job.video_count} videos with background music ready"
+        
+    except Exception as e:
+        multi_video_job_status[job_id].status = JobStatus.FAILED
+        multi_video_job_status[job_id].message = f"Multi-video processing failed: {str(e)}"
+        print(f"Multi-video pipeline error for job {job_id}: {str(e)}")
 
 # Helper function placeholders (implement actual logic in separate files)
 def extract_segments(file_path: str) -> List[VideoSegment]:
@@ -401,7 +615,7 @@ def process_video_pipeline(job_id: str):
             segments_with_audio = pick_audio(audio_request.sentiment_data, audio_request.audio_library)
             
             # Create the FFmpeg request
-            q = create_ffmpeg_request(
+            ffmpeg_request = create_ffmpeg_request(
                 original_video_path=audio_request.original_video_path,
                 output_video_path=output_path,
                 video_length=audio_request.sentiment_data.video_length,
@@ -457,20 +671,16 @@ def process_video_pipeline(job_id: str):
 
 # ==================== API ENDPOINTS ====================
 
-# WORKS!!!!
-@app.post('/api/video/upload', response_model=VideoUploadResponse)
-def upload_video(background_tasks: BackgroundTasks, video_file: UploadFile = File(...)):
+@app.post('/api/video/upload', response_model=MultiVideoUploadResponse)
+def upload_video(background_tasks: BackgroundTasks, video_files: List[UploadFile] = File(...)):
     """
-    Step 1: Upload video and start the complete processing pipeline
+    Upload one or more videos and start the complete processing pipeline
+    Handles both single video and multi-video processing automatically
     """
-    print(f"Uploading video: {video_file.filename}")
+    if not video_files:
+        raise HTTPException(status_code=400, detail="No video files provided")
     
-    # Validate file type
-    if not video_file.content_type or not video_file.content_type.startswith('video/'):
-        raise HTTPException(status_code=400, detail="File must be a video")
-    
-    if not video_file.filename:
-        raise HTTPException(status_code=400, detail="Filename is required")
+    print(f"Uploading {len(video_files)} video(s)")
     
     # Generate unique job ID
     job_id = str(uuid.uuid4())
@@ -479,59 +689,111 @@ def upload_video(background_tasks: BackgroundTasks, video_file: UploadFile = Fil
     upload_dir = "uploads"
     os.makedirs(upload_dir, exist_ok=True)
     
-    # Save uploaded file
-    file_path = os.path.join(upload_dir, f"{job_id}_{video_file.filename}")
-    try:
-        with open(file_path, "wb") as buffer:
-            content = video_file.file.read()
-            buffer.write(content)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
-    finally:
-        video_file.file.close()
+    # Save uploaded files
+    file_paths = []
+    for i, video_file in enumerate(video_files):
+        if not video_file.content_type or not video_file.content_type.startswith('video/'):
+            raise HTTPException(status_code=400, detail=f"File {i+1} must be a video")
+        if not video_file.filename:
+            raise HTTPException(status_code=400, detail=f"Filename for file {i+1} is required")
+        
+        file_path = os.path.join(upload_dir, f"{job_id}_{video_file.filename}")
+        try:
+            with open(file_path, "wb") as buffer:
+                content = video_file.file.read()
+                buffer.write(content)
+            file_paths.append(file_path)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to save file {i+1}: {str(e)}")
+        finally:
+            video_file.file.close()
     
-    # Initialize job status with JobInfo model
-    job_status[job_id] = JobInfo(
+    # Choose processing approach based on number of videos
+    if len(video_files) == 1:
+        # Single video processing (use existing pipeline)
+        video_file = video_files[0]
+        job_status[job_id] = JobInfo(
+            job_id=job_id,
+            status=JobStatus.UPLOADING,
+            message="Video uploaded, starting processing pipeline...",
+            filename=video_file.filename or "unknown.mp4",
+            file_path=file_paths[0],
+            created_at=datetime.datetime.now().isoformat(),
+            twelve_labs_video_id=None,
+            sentiment_analysis=None,
+            processed_video=None
+        )
+        
+        # Start single video processing pipeline
+        background_tasks.add_task(process_video_pipeline, job_id)
+        print(f"Single video processing pipeline started for job {job_id}")
+        
+        message = "Video uploaded, processing pipeline started"
+    else:
+        # Multi-video processing
+        multi_video_job_status[job_id] = MultiVideoJobInfo(
+            job_id=job_id,
+            status=JobStatus.UPLOADING,
+            message=f"Videos uploaded, starting multi-video processing pipeline for {len(video_files)} videos...",
+            filename=f"multi_video_{len(video_files)}_files",
+            file_path=upload_dir,
+            created_at=datetime.datetime.now().isoformat(),
+            twelve_labs_video_id=None,
+            sentiment_analysis=None,
+            processed_video=None,
+            video_count=len(video_files),
+            video_files=[f.filename for f in video_files if f.filename],
+            video_results=[],
+            aggregated_ffmpeg_request=None
+        )
+        
+        # Start multi-video processing pipeline
+        background_tasks.add_task(process_multi_video_pipeline, job_id)
+        print(f"Multi-video processing pipeline started for job {job_id}")
+        
+        message = f"Videos uploaded, multi-video processing pipeline started for {len(video_files)} videos"
+    
+    return MultiVideoUploadResponse(
         job_id=job_id,
         status=JobStatus.UPLOADING,
-        message="Video uploaded, starting processing pipeline...",
-        filename=video_file.filename,
-        file_path=file_path,
-        created_at=datetime.datetime.now().isoformat(),
-        twelve_labs_video_id=None,
-        sentiment_analysis=None,
-        processed_video=None
-    )
-    
-    # Start complete processing pipeline
-    background_tasks.add_task(process_video_pipeline, job_id)
-    
-    print(f"Processing pipeline started for job {job_id}")
-    
-    return VideoUploadResponse(
-        job_id=job_id,
-        status=JobStatus.UPLOADING,
-        message="Video uploaded, processing pipeline started"
+        message=message,
+        video_count=len(video_files),
+        video_files=[f.filename for f in video_files if f.filename]
     )
 
 @app.get('/api/video/status/{job_id}', response_model=JobStatusResponse)
 def get_processing_status(job_id: str):
     """
-    Get current status of video processing pipeline
+    Get current status of video processing pipeline (single or multi-video)
     """
-    if job_id not in job_status:
-        raise HTTPException(status_code=404, detail="Job not found")
+    # Check single video jobs first
+    if job_id in job_status:
+        job = job_status[job_id]
+        return JobStatusResponse(
+            job_id=job.job_id,
+            status=job.status,
+            message=job.message,
+            filename=job.filename,
+            created_at=job.created_at,
+            twelve_labs_video_id=job.twelve_labs_video_id,
+            progress_percentage=None
+        )
     
-    job = job_status[job_id]
-    return JobStatusResponse(
-        job_id=job.job_id,
-        status=job.status,
-        message=job.message,
-        filename=job.filename,
-        created_at=job.created_at,
-        twelve_labs_video_id=job.twelve_labs_video_id,
-        progress_percentage=None
-    )
+    # Check multi-video jobs
+    elif job_id in multi_video_job_status:
+        job = multi_video_job_status[job_id]
+        return JobStatusResponse(
+            job_id=job.job_id,
+            status=job.status,
+            message=job.message,
+            filename=job.filename,
+            created_at=job.created_at,
+            twelve_labs_video_id=job.twelve_labs_video_id,
+            progress_percentage=None
+        )
+    
+    else:
+        raise HTTPException(status_code=404, detail="Job not found")
 
 @app.get('/api/video/sentiment/{job_id}', response_model=SentimentResultResponse)
 def get_sentiment_analysis(job_id: str):
@@ -650,33 +912,54 @@ def get_processed_video_info(job_id: str):
 @app.get('/api/video/ffmpeg-request/{job_id}')
 def get_ffmpeg_request(job_id: str):
     """
-    Get the generated FFmpeg request for a completed video processing job
+    Get the generated FFmpeg request for a completed video processing job (single or multi-video)
     This can be used by external FFmpeg processing systems
     """
-    if job_id not in job_status:
+    # Check single video jobs first
+    if job_id in job_status:
+        job = job_status[job_id]
+        
+        if job.status not in [JobStatus.PROCESSING, JobStatus.COMPLETED]:
+            raise HTTPException(status_code=400, detail="FFmpeg request not yet available")
+        
+        processed_data = job.processed_video
+        if not processed_data:
+            raise HTTPException(status_code=404, detail="Processed video data not found")
+        
+        # The processing data should contain the FFmpeg request
+        if "ffmpeg_request" not in processed_data:
+            raise HTTPException(status_code=404, detail="FFmpeg request not found in processed data")
+        
+        return {
+            "job_id": job_id,
+            "status": job.status.value,
+            "ffmpeg_request": processed_data["ffmpeg_request"],
+            "total_segments": processed_data.get("total_segments", 0),
+            "audio_segments_count": processed_data.get("audio_segments_count", 0),
+            "message": "Single video FFmpeg request ready for execution"
+        }
+    
+    # Check multi-video jobs
+    elif job_id in multi_video_job_status:
+        job = multi_video_job_status[job_id]
+        
+        if job.status not in [JobStatus.PROCESSING, JobStatus.COMPLETED]:
+            raise HTTPException(status_code=400, detail="FFmpeg request not yet available")
+        
+        if not job.aggregated_ffmpeg_request:
+            raise HTTPException(status_code=404, detail="Aggregated FFmpeg request not found")
+        
+        return {
+            "job_id": job_id,
+            "status": job.status.value,
+            "ffmpeg_request": job.aggregated_ffmpeg_request,
+            "total_segments": len(job.aggregated_ffmpeg_request.get("input_segments", [])),
+            "video_count": job.video_count,
+            "message": "Multi-video aggregated FFmpeg request ready for execution"
+        }
+    
+    else:
         raise HTTPException(status_code=404, detail="Job not found")
-    
-    job = job_status[job_id]
-    
-    if job.status not in [JobStatus.PROCESSING, JobStatus.COMPLETED]:
-        raise HTTPException(status_code=400, detail="FFmpeg request not yet available")
-    
-    processed_data = job.processed_video
-    if not processed_data:
-        raise HTTPException(status_code=404, detail="Processed video data not found")
-    
-    # The processing data should contain the FFmpeg request
-    if "ffmpeg_request" not in processed_data:
-        raise HTTPException(status_code=404, detail="FFmpeg request not found in processed data")
-    
-    return {
-        "job_id": job_id,
-        "status": job.status.value,
-        "ffmpeg_request": processed_data["ffmpeg_request"],
-        "total_segments": processed_data.get("total_segments", 0),
-        "audio_segments_count": processed_data.get("audio_segments_count", 0),
-        "message": "FFmpeg request ready for execution"
-    }
 
 @app.get('/api/video/download/{job_id}')
 def download_processed_video(job_id: str):
