@@ -239,3 +239,74 @@ class FfmpegRequest(BaseModel):
                 "priority": 5
             }
         }
+
+# === Audio Library and Selection Models ===
+class AudioLibrary(BaseModel):
+    """Audio library mapping for different music styles and moods"""
+    happy_files: List[str] = Field(default=["music/happy.mp3"], description="Audio files for happy/positive moods")
+    sad_files: List[str] = Field(default=["music/sad.mp3"], description="Audio files for sad/negative moods")
+    neutral_files: List[str] = Field(default=["music/output_audio.mp3"], description="Audio files for neutral moods")
+    energetic_files: List[str] = Field(default=["music/happy.mp3"], description="Audio files for energetic moods")
+    calm_files: List[str] = Field(default=["music/sad.mp3"], description="Audio files for calm moods")
+
+class AudioSelection(BaseModel):
+    """Selected audio file for a video segment"""
+    audio_file: str = Field(..., description="Path to selected audio file")
+    volume: float = Field(1.0, description="Volume level (0.0-2.0)")
+    fade_in: Optional[str] = Field(None, description="Fade in duration")
+    fade_out: Optional[str] = Field(None, description="Fade out duration")
+
+class VideoSegmentWithAudio(VideoSegment):
+    """Extended video segment with audio selection"""
+    audio_selection: Optional[AudioSelection] = Field(None, description="Selected audio for this segment")
+
+class EnhancedSentimentAnalysisData(SentimentAnalysisData):
+    """Enhanced sentiment analysis data with audio selections"""
+    segments: List[VideoSegmentWithAudio] = Field(..., description="Video segments with audio selections")
+    audio_library: AudioLibrary = Field(default_factory=AudioLibrary, description="Available audio library")
+
+# === Audio Processing Request ===
+class AudioPickingRequest(BaseModel):
+    """Request for picking audio based on sentiment analysis"""
+    sentiment_data: SentimentAnalysisData = Field(..., description="Original sentiment analysis data")
+    original_video_path: str = Field(..., description="Path to original video file")
+    output_video_path: str = Field(..., description="Path for output video file")
+    audio_library: Optional[AudioLibrary] = Field(default_factory=AudioLibrary, description="Audio library to choose from")
+    global_volume: float = Field(0.3, description="Global background music volume")
+    crossfade_duration: str = Field("1.0", description="Crossfade duration between audio segments")
+
+# === Multi-Video Processing Models ===
+class MultiVideoUploadResponse(BaseModel):
+    """Response from multi-video upload endpoint"""
+    job_id: str = Field(..., description="Unique job identifier for multi-video processing")
+    status: JobStatus = Field(..., description="Initial job status")
+    message: str = Field(..., description="Status message")
+    video_count: int = Field(..., description="Number of videos uploaded")
+    video_files: List[str] = Field(..., description="List of uploaded video filenames")
+
+class VideoAnalysisResult(BaseModel):
+    """Result of analysis for a single video"""
+    video_index: int = Field(..., description="Index of video in the batch")
+    filename: str = Field(..., description="Original filename")
+    file_path: str = Field(..., description="Path to video file")
+    twelve_labs_video_id: Optional[str] = Field(None, description="Twelve Labs video ID")
+    sentiment_analysis: Optional[SentimentAnalysisResponse] = Field(None, description="Sentiment analysis result")
+    segments_with_audio: Optional[List[VideoSegmentWithAudio]] = Field(None, description="Video segments with audio selections")
+    video_length: Optional[float] = Field(None, description="Video length in seconds")
+    success: bool = Field(True, description="Whether analysis was successful")
+    error_message: Optional[str] = Field(None, description="Error message if analysis failed")
+
+class MultiVideoJobInfo(JobInfo):
+    """Extended job info for multi-video processing"""
+    video_count: int = Field(..., description="Number of videos being processed")
+    video_files: List[str] = Field(..., description="List of video filenames")
+    video_results: List[VideoAnalysisResult] = Field(default_factory=list, description="Results for each video")
+    aggregated_ffmpeg_request: Optional[Dict[str, Any]] = Field(None, description="Final aggregated FFmpeg request")
+
+class MultiVideoFFmpegRequest(BaseModel):
+    """Request for creating FFmpeg configuration from multiple videos"""
+    video_results: List[VideoAnalysisResult] = Field(..., description="Analysis results for all videos")
+    output_video_path: str = Field(..., description="Path for final output video")
+    global_volume: float = Field(0.3, description="Global background music volume")
+    crossfade_duration: str = Field("1.0", description="Crossfade duration between segments")
+    video_transition_duration: str = Field("0.5", description="Transition duration between videos")
