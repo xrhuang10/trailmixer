@@ -15,7 +15,7 @@ Analyze the video and extract the following information in structured JSON forma
 - Overall mood of the entire video
 
 **Segment Analysis:**
-- Break the video into logical segments based on mood/content changes
+- Break the video into logical segments based on mood/content changes. Don't change it too often, it should change every scene or at a clear mood switch, not every 5 seconds.
 - For each segment, identify:
   - Start and end times (in seconds only, as numbers)
   - Sentiment/mood of that specific segment
