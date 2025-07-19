@@ -24,7 +24,15 @@ def build_input_stream(segment: InputSegment, index: int):
 
     # Handle clip selection from input file
     clip_start_seconds = _time_to_seconds(segment.clip_start or "00:00:00")
-    clip_end_seconds = _time_to_seconds(segment.clip_end or "23:59:59")
+    
+    # Calculate end time based on segment type and timing
+    if segment.file_type == 'audio':
+        # For audio, use the segment end_time if clip_end is not specified
+        clip_end_seconds = _time_to_seconds(segment.clip_end or segment.end_time or "00:01:00")
+    else:
+        # For video, use end_time if clip_end is not specified
+        clip_end_seconds = _time_to_seconds(segment.clip_end or segment.end_time or "00:01:00")
+    
     clip_duration = clip_end_seconds - clip_start_seconds
 
     if segment.clip_start:
@@ -47,9 +55,10 @@ def build_input_stream(segment: InputSegment, index: int):
         if segment.fade_in:
             stream = ffmpeg.filter(stream, 'afade', t='in', st=0, d=segment.fade_in)
         if segment.fade_out:
-            # Calculate fade out start time based on duration
-            fade_out_seconds = _time_to_seconds(segment.fade_out)
-            fade_start = clip_duration - fade_out_seconds
+            # Calculate fade out start time based on actual segment duration
+            fade_out_seconds = float(segment.fade_out)
+            segment_duration = _time_to_seconds(segment.end_time) - _time_to_seconds(segment.start_time)
+            fade_start = max(0, segment_duration - fade_out_seconds)
             stream = ffmpeg.filter(stream, 'afade', t='out', st=fade_start, d=segment.fade_out)
         
         # Handle placement timing
@@ -64,9 +73,10 @@ def build_input_stream(segment: InputSegment, index: int):
         if segment.fade_in:
             stream = ffmpeg.filter(stream, 'fade', t='in', st=0, d=segment.fade_in)
         if segment.fade_out:
-            # Calculate fade out start time based on duration
-            fade_out_seconds = _time_to_seconds(segment.fade_out)
-            fade_start = clip_duration - fade_out_seconds
+            # Calculate fade out start time based on actual segment duration
+            fade_out_seconds = float(segment.fade_out)
+            segment_duration = _time_to_seconds(segment.end_time) - _time_to_seconds(segment.start_time)
+            fade_start = max(0, segment_duration - fade_out_seconds)
             stream = ffmpeg.filter(stream, 'fade', t='out', st=fade_start, d=segment.fade_out)
     
     # Handle invalid file type

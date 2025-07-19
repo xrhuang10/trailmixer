@@ -1,0 +1,23 @@
+{
+  "video_id": "1234567890",
+  "video_title": "Young Man Speaking to Camera",
+  "video_description": "A young man with short curly hair speaks directly to the camera while sitting on a couch. He wears a white t-shirt and has a silver earring in his left ear. The background includes a window with blinds and a framed picture on the wall. He discusses posting the video three years later and wonders about his future subscriber count.",
+  "video_length": 31,
+  "overall_mood": "neutral",
+  "segments": [
+    {
+      "start_time": 0,
+      "end_time": 15,
+      "sentiment": "neutral",
+      "music_style": "ambient",
+      "intensity": "low"
+    },
+    {
+      "start_time": 15,
+      "end_time": 31,
+      "sentiment": "neutral",
+      "music_style": "ambient",
+      "intensity": "low"
+    }
+  ]
+}
