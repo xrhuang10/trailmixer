@@ -32,14 +32,33 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Test TrailMixer FFmpeg pipeline")
     parser.add_argument('--audio', type=str, help='Path to input audio file')
     parser.add_argument('--video', type=str, help='Path to input video file')
-    parser.add_argument('--audio-start', type=str, default="00:00:00", 
-                       help='Start time for audio (format: HH:MM:SS or HH:MM:SS.mmm)')
-    parser.add_argument('--audio-end', type=str, default="23:59:59", 
-                       help='End time for audio (format: HH:MM:SS or HH:MM:SS.mmm)')
+    
+    # Video trimming and placement
+    parser.add_argument('--video-clip-start', type=str, default="00:00:00", 
+                       help='Start time in the video file to use (format: HH:MM:SS or HH:MM:SS.mmm)')
+    parser.add_argument('--video-clip-end', type=str, default="23:59:59", 
+                       help='End time in the video file to use (format: HH:MM:SS or HH:MM:SS.mmm)')
     parser.add_argument('--video-start', type=str, default="00:00:00", 
-                       help='Start time for video (format: HH:MM:SS or HH:MM:SS.mmm)')
+                       help='Time in output where video should start (format: HH:MM:SS or HH:MM:SS.mmm)')
     parser.add_argument('--video-end', type=str, default="23:59:59", 
-                       help='End time for video (format: HH:MM:SS or HH:MM:SS.mmm)')
+                       help='Time in output where video should end (format: HH:MM:SS or HH:MM:SS.mmm)')
+    
+    # Audio clip selection and placement
+    parser.add_argument('--audio-clip-start', type=str, default="00:00:00", 
+                       help='Start time in the audio file to use (format: HH:MM:SS or HH:MM:SS.mmm)')
+    parser.add_argument('--audio-clip-end', type=str, default="23:59:59", 
+                       help='End time in the audio file to use (format: HH:MM:SS or HH:MM:SS.mmm)')
+    parser.add_argument('--audio-start', type=str, default="00:00:00",
+                       help='Time in output where audio should start (format: HH:MM:SS or HH:MM:SS.mmm)')
+    parser.add_argument('--audio-end', type=str, default="23:59:59",
+                       help='Time in output where audio should end (format: HH:MM:SS or HH:MM:SS.mmm)')
+    
+    # Volume controls
+    parser.add_argument('--audio-volume', type=float, default=0.5,
+                       help='Volume level for the added audio (0.0 to 1.0)')
+    parser.add_argument('--video-volume', type=float, default=1.0,
+                       help='Volume level for the video\'s audio (0.0 to 1.0)')
+    
     return parser.parse_args()
 
 def check_ffmpeg():
@@ -152,7 +171,9 @@ def test_audio_processing(test_files, args):
                     file_type='audio',
                     start_time=args.audio_start,
                     end_time=args.audio_end,
-                    volume=0.5,
+                    clip_start=args.audio_clip_start,
+                    clip_end=args.audio_clip_end,
+                    volume=args.audio_volume,
                     fade_in=None,
                     fade_out=None,
                     metadata=None
@@ -209,9 +230,11 @@ def test_video_processing(test_files, args):
                     file_type='video',
                     start_time=args.video_start,
                     end_time=args.video_end,
+                    clip_start=args.video_clip_start,
+                    clip_end=args.video_clip_end,
                     fade_in="0.5",
                     fade_out="0.5",
-                    volume=1.0,
+                    volume=args.video_volume,
                     metadata=None
                 )
             ],
@@ -249,8 +272,8 @@ def test_combined_processing(test_files, args):
     """Test combining video and audio"""
     print("\n🎭 Testing video + audio processing...")
     
-    if not test_files or 'video' not in test_files or 'audio' not in test_files:
-        print("⚠️  Skipping combined test - missing test files")
+    if not test_files or 'video' not in test_files:
+        print("⚠️  Skipping combined test - missing video file")
         return False
     
     try:
@@ -259,39 +282,43 @@ def test_combined_processing(test_files, args):
         
         output_path = Path(test_files['video']).parent / "output_combined.mp4"
         
-        request = FfmpegRequest(
-            input_segments=[
-                InputSegment(
-                    file_path=test_files['video'],
-                    file_type='video',
-                    start_time=args.video_start,
-                    end_time=args.video_end,
-                    volume=0.5,  # Reduce volume of video's audio
-                    fade_in=None,
-                    fade_out=None,
-                    metadata=None
-                ),
-                InputSegment(
-                    file_path=test_files['video'],
-                    file_type='audio',  # Extract audio from video
-                    start_time=args.video_start,
-                    end_time=args.video_end,
-                    volume=0.5,  # Mix with the other audio at half volume
-                    fade_in=None,
-                    fade_out=None,
-                    metadata=None
-                ),
+        # Start with video segment (includes original audio)
+        input_segments = [
+            InputSegment(
+                file_path=test_files['video'],
+                file_type='video',
+                start_time=args.video_start,
+                end_time=args.video_end,
+                clip_start=args.video_clip_start,
+                clip_end=args.video_clip_end,
+                volume=args.video_volume,  # Control video's audio volume
+                fade_in=None,
+                fade_out=None,
+                metadata=None
+            )
+        ]
+        
+        # Add audio file if provided
+        if 'audio' in test_files:
+            input_segments.append(
                 InputSegment(
                     file_path=test_files['audio'],
                     file_type='audio',
+                    # When to place in output timeline
                     start_time=args.audio_start,
                     end_time=args.audio_end,
-                    volume=0.5,  # Mix at half volume
-                    fade_in=None,
-                    fade_out=None,
+                    # Which part of audio file to use
+                    clip_start=args.audio_clip_start,
+                    clip_end=args.audio_clip_end,
+                    volume=args.audio_volume,  # Control added audio volume
+                    fade_in="0.5",  # Add slight fade for smooth transition
+                    fade_out="0.5",
                     metadata=None
                 )
-            ],
+            )
+        
+        request = FfmpegRequest(
+            input_segments=input_segments,
             output_file=str(output_path),
             video_codec=VideoCodec.H264,
             audio_codec=AudioCodec.AAC,
@@ -305,7 +332,7 @@ def test_combined_processing(test_files, args):
             audio_channels=2,
             audio_sample_rate=44100,
             global_volume=1.0,
-            normalize_audio=True,  # Normalize the mixed audio
+            normalize_audio=True,  # Normalize the final mix
             crossfade_duration=None,
             gap_duration="00:00:00",
             overwrite=True,

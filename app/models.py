@@ -21,8 +21,10 @@ class InputSegment(BaseModel):
     """Represents a single input segment with timing information"""
     file_path: str = Field(..., description="Path to the input file (video or audio)")
     file_type: str = Field(..., description="Type of file: 'video' or 'audio'")
-    start_time: str = Field("00:00:00", description="Start time in the input file (format: HH:MM:SS or HH:MM:SS.mmm)")
-    end_time: str = Field(..., description="End time in the input file (format: HH:MM:SS or HH:MM:SS.mmm)")
+    start_time: str = Field("00:00:00", description="Time in the output where this segment should start (format: HH:MM:SS or HH:MM:SS.mmm)")
+    end_time: str = Field(..., description="Time in the output where this segment should end (format: HH:MM:SS or HH:MM:SS.mmm)")
+    clip_start: Optional[str] = Field("00:00:00", description="Start time in the input file to use (format: HH:MM:SS or HH:MM:SS.mmm)")
+    clip_end: Optional[str] = Field(None, description="End time in the input file to use (format: HH:MM:SS or HH:MM:SS.mmm)")
     volume: Optional[float] = Field(1.0, description="Volume multiplier for this segment")
     fade_in: Optional[str] = Field(None, description="Fade in duration for this segment")
     fade_out: Optional[str] = Field(None, description="Fade out duration for this segment")
