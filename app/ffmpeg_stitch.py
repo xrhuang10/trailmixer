@@ -191,4 +191,4 @@ def stitch_ffmpeg_request(request: FfmpegRequest) -> str:
         error_msg = e.stderr.decode() if e.stderr else "No error output"
         stdout_msg = e.stdout.decode() if e.stdout else "No stdout output"
         cmd = ' '.join(ffmpeg.get_args(output))
-        raise RuntimeError(f"FFmpeg failed:\nCommand: {cmd}\nSTDERR:\n{error_msg}\nSTDOUT:\n{stdout_msg}")
+        raise RuntimeError(f"FFmpeg failed:\nCommand: {cmd}\nSTDERR:\n{error_msg}\nSTDOUT:\n{stdout_msg}") 

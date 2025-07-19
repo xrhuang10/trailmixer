@@ -27,6 +27,12 @@ from pathlib import Path
 # Add the app directory to the path
 sys.path.append(str(Path(__file__).parent / "app"))
 
+def ensure_output_dir():
+    """Create processed_videos directory if it doesn't exist"""
+    output_dir = Path(__file__).parent / "processed_videos"
+    output_dir.mkdir(exist_ok=True)
+    return output_dir
+
 def parse_args():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(description="Test TrailMixer FFmpeg pipeline")
@@ -152,7 +158,7 @@ def test_imports():
     print("\n🔍 Testing imports...")
     
     try:
-        from app.ffmpeg import stitch_ffmpeg_request
+        from app.ffmpeg_stitch import stitch_ffmpeg_request
         from app.models import FfmpegRequest, InputSegment, AudioCodec, VideoCodec
         print("✅ All imports successful")
         return True
@@ -169,10 +175,10 @@ def test_audio_processing(test_files, args):
         return False
     
     try:
-        from app.ffmpeg import stitch_ffmpeg_request
+        from app.ffmpeg_stitch import stitch_ffmpeg_request
         from app.models import FfmpegRequest, InputSegment, AudioCodec, VideoCodec
         
-        output_path = Path(test_files['audio']).parent / "output_audio.mp3"
+        output_path = ensure_output_dir() / "output_audio.mp3"
         
         request = FfmpegRequest(
             input_segments=[
@@ -228,10 +234,10 @@ def test_video_processing(test_files, args):
         return False
     
     try:
-        from app.ffmpeg import stitch_ffmpeg_request
+        from app.ffmpeg_stitch import stitch_ffmpeg_request
         from app.models import FfmpegRequest, InputSegment, VideoCodec, AudioCodec
         
-        output_path = Path(test_files['video']).parent / "output_video.mp4"
+        output_path = ensure_output_dir() / "output_video.mp4"
         
         request = FfmpegRequest(
             input_segments=[
@@ -287,10 +293,10 @@ def test_combined_processing(test_files, args):
         return False
     
     try:
-        from app.ffmpeg import stitch_ffmpeg_request
+        from app.ffmpeg_stitch import stitch_ffmpeg_request
         from app.models import FfmpegRequest, InputSegment, VideoCodec, AudioCodec
         
-        output_path = Path(test_files['video']).parent / "output_combined.mp4"
+        output_path = ensure_output_dir() / "output_combined.mp4"
         
         # Create video segment with muted audio
         video_segment = InputSegment(

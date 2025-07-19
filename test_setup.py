@@ -52,7 +52,7 @@ def test_ffmpeg_module():
     print("\n🔍 Testing FFmpeg module...")
     
     try:
-        from app.ffmpeg import stitch_ffmpeg_request
+        from app.ffmpeg_stitch import stitch_ffmpeg_request
         from app.models import FfmpegRequest, InputSegment, AudioCodec, VideoCodec
         print("✅ FFmpeg module imports successfully")
         return True
@@ -104,7 +104,7 @@ def test_silent_audio_creation():
     print("\n🔍 Testing silent audio creation...")
     
     try:
-        from app.ffmpeg import stitch_ffmpeg_request
+        from app.ffmpeg_stitch import stitch_ffmpeg_request
         from app.models import FfmpegRequest, InputSegment, AudioCodec
         
         with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as tmp_file:

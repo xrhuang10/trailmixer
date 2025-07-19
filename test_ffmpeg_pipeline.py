@@ -22,7 +22,7 @@ import ffmpeg
 # Add the app directory to the path
 sys.path.append(str(Path(__file__).parent / "app"))
 
-from app.ffmpeg import stitch_ffmpeg_request
+from app.ffmpeg_stitch import stitch_ffmpeg_request
 from app.models import FfmpegRequest, InputSegment, AudioCodec, VideoCodec
 
 def _get_default_request_params():
