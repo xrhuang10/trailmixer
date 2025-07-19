@@ -240,26 +240,22 @@ def process_video_segments(request: VideoProcessingRequest) -> VideoProcessingRe
             crossfade_duration=audio_request.crossfade_duration
         )
         
-        # TODO: Actually execute the FFmpeg request
-        # For now, we'll just log what would be processed
-        print(f"🎬 FFmpeg processing summary for '{request.sentiment_data.video_title}' (Job: {request.job_id}):")
-        video_segments = [s for s in ffmpeg_request.input_segments if s.file_type == "video"]
-        audio_segments = [s for s in ffmpeg_request.input_segments if s.file_type == "audio"]
-        
-        print(f"  📹 Video tracks: {len(video_segments)}")
-        print(f"  🎵 Audio tracks: {len(audio_segments)}")
-        
-        for i, segment in enumerate(audio_segments):
-            sentiment = segment.metadata.get("sentiment", "unknown") if segment.metadata else "unknown"
-            music_style = segment.metadata.get("music_style", "unknown") if segment.metadata else "unknown"
-            audio_file = os.path.basename(segment.file_path)
-            print(f"    Audio {i+1}: {audio_file} | {sentiment} | {music_style} | Vol: {segment.volume:.2f}")
+        # Execute the FFmpeg request
+        print(f"🎬 Starting FFmpeg processing for '{request.sentiment_data.video_title}' (Job: {request.job_id})...")
+        try:
+            from ffmpeg_stitch import stitch_ffmpeg_request
+            result_path = stitch_ffmpeg_request(ffmpeg_request)
+            print(f"✅ FFmpeg processing completed successfully! Output saved to: {os.path.basename(result_path)}")
+        except Exception as e:
+            error_msg = str(e)
+            print(f"❌ FFmpeg processing failed: {error_msg}")
+            raise RuntimeError(f"FFmpeg processing failed: {error_msg}")
         
         # Calculate actual duration from segments
         max_end_time = max(seg.end_time for seg in request.sentiment_data.segments)
         duration = seconds_to_time_format(max_end_time)
         
-        print(f"✅ Video processing prepared for '{request.sentiment_data.video_title}' | Total duration: {duration}")
+        print(f"✅ Video processing completed for '{request.sentiment_data.video_title}' | Total duration: {duration}")
         
         return VideoProcessingResult(
             output_path=output_path,
