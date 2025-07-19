@@ -117,24 +117,24 @@ Use the following structure for the `"music"` object:
         {{
             "start": 0,
             "end": length_a,
-            "style": "<one of: Classical, Hip Hop, Pop, Electronic, Meme>",
+            "style": "{music_style}",
             "intensity": "<analyzed intensity>",
-            "sentiment": "<one word from: {', '.join(sentiment_list)} that is different from the other tracks>"
+            "sentiment": "<one word from: "happy", "sad", "energetic", "calm", "dramatic", "romantic", "suspenseful"
         }},
         {{
             "start": length_a,
             "end": length_b,
-            "style": "<different style from above>",
+            "style": "{music_style}",
             "intensity": "<analyzed intensity>",
-            "sentiment": "<one word from: {', '.join(sentiment_list)} that is different from the other tracks>"
+            "sentiment": "<one word from: "happy", "sad", "energetic", "calm", "dramatic", "romantic", "suspenseful>"
         }},
         ...
         {{
             "start": length_n,
             "end": total_duration_of_included_segments (must be the lesser of {desired_length} and video length),
-            "style": "<style not repeated in other tracks>",
+            "style": "{music_style}",
             "intensity": "<analyzed intensity>",
-            "sentiment": "<one word from: {', '.join(sentiment_list)} that is different from the other tracks>"
+            "sentiment": "<one word from: "happy", "sad", "energetic", "calm", "dramatic", "romantic", "suspenseful>""
         }}
     ]
 }}'''}
@@ -146,7 +146,7 @@ Use the following structure for the `"music"` object:
 - Track time ranges must not overlap.
 - All timestamps must be numeric values in seconds.
 - Each track must use a **unique combination** of `style` and `sentiment`.
-- Track sentiment must be a single word strictly from: {', '.join(sentiment_list)}.
+- Track sentiment must be a single word strictly from: "happy", "sad", "energetic", "calm", "dramatic", "romantic", "suspenseful".
 
 ---
 
