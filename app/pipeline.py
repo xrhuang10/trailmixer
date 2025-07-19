@@ -100,13 +100,14 @@ def process_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
         
         # Add original video as input segment
         video_length = sentiment_data.get('video_length', 60)
+        video_formatted_duration = f'{int(video_length//3600):02d}:{int((video_length%3600)//60):02d}:{int(video_length%60):02d}'
         video_segment = InputSegment(
             file_path=file_path,
             file_type='video',
             start_time='00:00:00',
-            end_time=f'{int(video_length//3600):02d}:{int((video_length%3600)//60):02d}:{int(video_length%60):02d}',
+            end_time=video_formatted_duration,
             clip_start='00:00:00',
-            clip_end=None,
+            clip_end=video_formatted_duration,  # Set explicit clip end
             volume=1.0,
             fade_in=None,
             fade_out=None,
@@ -117,8 +118,8 @@ def process_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
         # Add audio segments from music file paths
         print(f"🎵 Adding {len(music_file_paths)} audio segments...")
         for audio_file, timing_info in music_file_paths.items():
-            start_time = timing_info.get('start', 0)
-            end_time = timing_info.get('end', 60)
+            start_time = min(timing_info.get('start', 0), video_length)  # Ensure start doesn't exceed video length
+            end_time = min(timing_info.get('end', video_length), video_length)  # Use video length as default/max
             
             # Convert seconds to HH:MM:SS format
             start_formatted = f'{int(start_time//3600):02d}:{int((start_time%3600)//60):02d}:{int(start_time%60):02d}'
@@ -130,7 +131,7 @@ def process_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
                 start_time=start_formatted,
                 end_time=end_formatted,
                 clip_start='00:00:00',
-                clip_end=None,
+                clip_end=end_formatted,  # Set explicit clip end
                 volume=0.3,  # Background music volume
                 fade_in='0.5',
                 fade_out='0.5',
