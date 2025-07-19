@@ -10,6 +10,11 @@ Usage:
     python quick_test.py --audio input.mp3    # Test with custom audio file
     python quick_test.py --video input.mp4    # Test with custom video file
     python quick_test.py --audio in.mp3 --video in.mp4  # Test with both
+    
+Time format: HH:MM:SS or HH:MM:SS.mmm
+Examples:
+    --audio-start 00:00:10 --audio-end 00:01:30  # Trim audio from 10s to 1m30s
+    --video-start 00:01:00 --video-end 00:02:00  # Trim video from 1m to 2m
 """
 
 import os
@@ -27,6 +32,14 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Test TrailMixer FFmpeg pipeline")
     parser.add_argument('--audio', type=str, help='Path to input audio file')
     parser.add_argument('--video', type=str, help='Path to input video file')
+    parser.add_argument('--audio-start', type=str, default="00:00:00", 
+                       help='Start time for audio (format: HH:MM:SS or HH:MM:SS.mmm)')
+    parser.add_argument('--audio-end', type=str, default="23:59:59", 
+                       help='End time for audio (format: HH:MM:SS or HH:MM:SS.mmm)')
+    parser.add_argument('--video-start', type=str, default="00:00:00", 
+                       help='Start time for video (format: HH:MM:SS or HH:MM:SS.mmm)')
+    parser.add_argument('--video-end', type=str, default="23:59:59", 
+                       help='End time for video (format: HH:MM:SS or HH:MM:SS.mmm)')
     return parser.parse_args()
 
 def check_ffmpeg():
@@ -118,7 +131,7 @@ def test_imports():
         print(f"❌ Import failed: {e}")
         return False
 
-def test_audio_processing(test_files):
+def test_audio_processing(test_files, args):
     """Test basic audio processing"""
     print("\n🎵 Testing audio processing...")
     
@@ -137,8 +150,8 @@ def test_audio_processing(test_files):
                 InputSegment(
                     file_path=test_files['audio'],
                     file_type='audio',
-                    start_time="00:00:00",
-                    end_time="00:00:01",  # 1 second
+                    start_time=args.audio_start,
+                    end_time=args.audio_end,
                     volume=0.5,
                     fade_in=None,
                     fade_out=None,
@@ -175,7 +188,7 @@ def test_audio_processing(test_files):
         print(f"❌ Audio processing failed:\n{str(e)}")
         return False
 
-def test_video_processing(test_files):
+def test_video_processing(test_files, args):
     """Test basic video processing"""
     print("\n🎬 Testing video processing...")
     
@@ -194,17 +207,17 @@ def test_video_processing(test_files):
                 InputSegment(
                     file_path=test_files['video'],
                     file_type='video',
-                    start_time="00:00:00",
-                    end_time="00:00:01",  # 1 second
-                    fade_in="0.1",
-                    fade_out="0.1",
+                    start_time=args.video_start,
+                    end_time=args.video_end,
+                    fade_in="0.5",
+                    fade_out="0.5",
                     volume=1.0,
                     metadata=None
                 )
             ],
             output_file=str(output_path),
             video_codec=VideoCodec.H264,
-            quiet=False,  # Changed to see FFmpeg output
+            quiet=False,  # Keep FFmpeg output visible
             audio_codec=AudioCodec.AAC,  # This won't be used for video-only
             video_bitrate=None,
             audio_bitrate=None,
@@ -232,7 +245,7 @@ def test_video_processing(test_files):
         print(f"❌ Video processing failed:\n{str(e)}")
         return False
 
-def test_combined_processing(test_files):
+def test_combined_processing(test_files, args):
     """Test combining video and audio"""
     print("\n🎭 Testing video + audio processing...")
     
@@ -251,9 +264,19 @@ def test_combined_processing(test_files):
                 InputSegment(
                     file_path=test_files['video'],
                     file_type='video',
-                    start_time="00:00:00",
-                    end_time="00:00:01",  # 1 second
-                    volume=1.0,
+                    start_time=args.video_start,
+                    end_time=args.video_end,
+                    volume=0.5,  # Reduce volume of video's audio
+                    fade_in=None,
+                    fade_out=None,
+                    metadata=None
+                ),
+                InputSegment(
+                    file_path=test_files['video'],
+                    file_type='audio',  # Extract audio from video
+                    start_time=args.video_start,
+                    end_time=args.video_end,
+                    volume=0.5,  # Mix with the other audio at half volume
                     fade_in=None,
                     fade_out=None,
                     metadata=None
@@ -261,9 +284,9 @@ def test_combined_processing(test_files):
                 InputSegment(
                     file_path=test_files['audio'],
                     file_type='audio',
-                    start_time="00:00:00",
-                    end_time="00:00:01",  # 1 second
-                    volume=1.0,
+                    start_time=args.audio_start,
+                    end_time=args.audio_end,
+                    volume=0.5,  # Mix at half volume
                     fade_in=None,
                     fade_out=None,
                     metadata=None
@@ -272,9 +295,9 @@ def test_combined_processing(test_files):
             output_file=str(output_path),
             video_codec=VideoCodec.H264,
             audio_codec=AudioCodec.AAC,
-            quiet=True,
+            quiet=False,
             video_bitrate=None,
-            audio_bitrate=None,
+            audio_bitrate="192k",  # Higher quality for mixed audio
             crf=None,
             preset="medium",
             scale=None,
@@ -282,7 +305,7 @@ def test_combined_processing(test_files):
             audio_channels=2,
             audio_sample_rate=44100,
             global_volume=1.0,
-            normalize_audio=False,
+            normalize_audio=True,  # Normalize the mixed audio
             crossfade_duration=None,
             gap_duration="00:00:00",
             overwrite=True,
@@ -296,7 +319,7 @@ def test_combined_processing(test_files):
         return True
         
     except Exception as e:
-        print(f"❌ Combined processing failed: {e}")
+        print(f"❌ Combined processing failed:\n{str(e)}")
         return False
 
 def main():
@@ -331,11 +354,11 @@ def main():
         
         # Add tests based on available files
         if 'audio' in test_files:
-            tests.append(("Audio Processing", lambda: test_audio_processing(test_files)))
+            tests.append(("Audio Processing", lambda: test_audio_processing(test_files, args)))
         if 'video' in test_files:
-            tests.append(("Video Processing", lambda: test_video_processing(test_files)))
+            tests.append(("Video Processing", lambda: test_video_processing(test_files, args)))
         if 'audio' in test_files and 'video' in test_files:
-            tests.append(("Combined Processing", lambda: test_combined_processing(test_files)))
+            tests.append(("Combined Processing", lambda: test_combined_processing(test_files, args)))
         
         passed = 0
         total = len(tests)
