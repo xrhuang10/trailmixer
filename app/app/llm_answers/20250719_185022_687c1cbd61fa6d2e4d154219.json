@@ -1,0 +1,107 @@
+{
+  "video_id": "hackthe6ix",
+  "video_title": "Hackathon Highlights",
+  "video_description": "A compilation of scenes from a hackathon event, showcasing various activities and interactions.",
+  "video_length": 145,
+  "desired_cropped_length": 60,
+  "overall_mood": "energetic",
+  "segments": [
+    {
+      "start_time": 0,
+      "end_time": 7,
+      "sentiment": "positive",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 11,
+      "end_time": 19,
+      "sentiment": "neutral",
+      "music_style": "Pop",
+      "intensity": "low",
+      "include": true
+    },
+    {
+      "start_time": 34,
+      "end_time": 38,
+      "sentiment": "positive",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 40,
+      "end_time": 45,
+      "sentiment": "neutral",
+      "music_style": "Pop",
+      "intensity": "low",
+      "include": true
+    },
+    {
+      "start_time": 58,
+      "end_time": 69,
+      "sentiment": "positive",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 105,
+      "end_time": 110,
+      "sentiment": "positive",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 126,
+      "end_time": 130,
+      "sentiment": "positive",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 131,
+      "end_time": 135,
+      "sentiment": "positive",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 136,
+      "end_time": 138,
+      "sentiment": "positive",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    }
+  ],
+  "music": {
+    "tracks": [
+      {
+        "start": 0,
+        "end": 20,
+        "style": "Pop",
+        "intensity": "medium",
+        "sentiment": "happy"
+      },
+      {
+        "start": 20,
+        "end": 40,
+        "style": "Pop",
+        "intensity": "low",
+        "sentiment": "calm"
+      },
+      {
+        "start": 40,
+        "end": 60,
+        "style": "Pop",
+        "intensity": "high",
+        "sentiment": "energetic"
+      }
+    ]
+  }
+}

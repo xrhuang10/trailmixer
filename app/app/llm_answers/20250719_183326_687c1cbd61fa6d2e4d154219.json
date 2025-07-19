@@ -1,0 +1,133 @@
+{
+  "video_id": "hackthe6ix",
+  "video_title": "Hackathon Highlights",
+  "video_description": "A compilation of scenes from a hackathon event, showcasing various activities and interactions.",
+  "video_length": 141,
+  "desired_cropped_length": 60,
+  "overall_mood": "energetic",
+  "segments": [
+    {
+      "start_time": 0,
+      "end_time": 7,
+      "sentiment": "exciting",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 11,
+      "end_time": 14,
+      "sentiment": "happy",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 28,
+      "end_time": 31,
+      "sentiment": "focused",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 31,
+      "end_time": 35,
+      "sentiment": "engaged",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 40,
+      "end_time": 43,
+      "sentiment": "collaborative",
+      "music_style": "Pop",
+      "intensity": "low",
+      "include": true
+    },
+    {
+      "start_time": 50,
+      "end_time": 53,
+      "sentiment": "productive",
+      "music_style": "Pop",
+      "intensity": "low",
+      "include": true
+    },
+    {
+      "start_time": 53,
+      "end_time": 56,
+      "sentiment": "informative",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 60,
+      "end_time": 63,
+      "sentiment": "competitive",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 70,
+      "end_time": 73,
+      "sentiment": "entertaining",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 80,
+      "end_time": 83,
+      "sentiment": "skillful",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 90,
+      "end_time": 93,
+      "sentiment": "amused",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 99,
+      "end_time": 102,
+      "sentiment": "curious",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 108,
+      "end_time": 111,
+      "sentiment": "joyful",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 127,
+      "end_time": 132,
+      "sentiment": "proud",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    }
+  ],
+  "music": {
+    "tracks": [
+      {
+        "start": 0,
+        "end": 60,
+        "style": "Pop",
+        "intensity": "high",
+        "sentiment": "energetic"
+      }
+    ]
+  }
+}

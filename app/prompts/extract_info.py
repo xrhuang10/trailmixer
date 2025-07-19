@@ -58,77 +58,114 @@ twelvelabs_output_schema = {
 
 desired_length = 60  # in seconds
 music_style = "Pop"  # One of: Classical, Hip Hop, Pop, Electronic, Meme
-music_intensity = "medium"  # Can also make this a variable if needed
-num_tracks = 1
+num_tracks = 3
 sentiment_list = ["happy", "sad", "energetic", "calm", "dramatic", "romantic", "suspenseful"]
 
-# Track format
-song_format = {
-    "music": {
-        "tracks": [
-            {
-                "start": 0,
-                "end": desired_length,
-                "style": music_style,
-                "intensity": music_intensity,
-            }
-        ]
-    }
-}
+# # Track format
+# song_format = {
+#     "music": {
+#         "tracks": [
+#             {
+#                 "start": 0,
+#                 "end": desired_length,
+#                 "style": music_style,
+#                 "intensity": music_intensity,
+#             }
+#         ]
+#     }
+# }
 
-# Inject music track schema into the output schema template
-twelvelabs_output_schema.update(song_format)
+# # Inject music track schema into the output schema template
+# twelvelabs_output_schema.update(song_format)
 
 extract_info_prompt = f"""
 You are a professional video analyst that extracts information from videos for automated music mixing and editing.
 
 You will be given a video and must:
-1. Analyze and break it into logical segments (based on mood, content, or scene/highlight changes).
-2. Select the most important segments to KEEP (to crop the video down to a final length of {desired_length} seconds, give or take a few seconds`).
+1. Analyze and break it into logical segments based on mood, content, or scene/highlight changes.
+2. Select the most important segments to KEEP, such that the total cropped duration is the **lesser of** the video length and approximately {desired_length} seconds (allow a few seconds of flexibility for clean scene transitions).
 3. Propose {num_tracks} suitable music track(s) based on the mood and pacing of the selected segments.
 
-Each segment should include:
-- Start time (in seconds)
-- End time (in seconds)
-- Sentiment/mood
-- Music style, which should strictly be {music_style}
-- Intensity level (low, medium, high)
-- "include": true or false (true = included in cropped final)
+Each segment must include:
+- "start_time": (number, in seconds)
+- "end_time": (number, in seconds)
+- "sentiment": the mood of the segment
+- "music_style": strictly "{music_style}"
+- "intensity": one of ["low", "medium", "high"]
+- "include": true or false (true if segment is included in the cropped final video)
+
+---
 
 **Music Track Guidelines:**
-- Propose ONE track that fits the overall mood and intensity of the selected segments.
-- Use this format:
-  "music": {{
-      "tracks": [
-          {{
-              "start": 0,
-              "end": {desired_length},
-              "style": "{music_style}",
-              "intensity": "{music_intensity}"
-              "sentiment": The single overall sentiment of the track, which should strictly be a single word from the following list: {sentiment_list}
-          }}
-      ]
-  }}
-- Ensure this matches the dominant mood/intensity from included segments.
 
-**General Instructions:**
-- Total time of all segments must NOT exceed {desired_length} seconds.
-- Only select the most meaningful scenes (e.g., high emotion, action, climax).
-- All timestamps must be in seconds as numbers (e.g., 32.5)
-- No overlapping or skipped time in selected segments.
-- Do not include the full video unless it’s shorter than {desired_length} seconds.
+Use the following structure for the `"music"` object:
 
-**Also provide:**
-- Full original length
-- Desired final length (which is {desired_length} seconds)
-- Overall sentiment of the full video
+{f'''Single track format (if num_tracks = 1):
+"music": {{
+    "tracks": [
+        {{
+            "start": 0,
+            "end": total_duration_of_included_segments (must be the lesser of {desired_length} and video length),
+            "style": "{music_style}",
+            "intensity": "<analyzed intensity>",
+            "sentiment": "<one word from: {', '.join(sentiment_list)}>"
+        }}
+    ]
+}}''' if num_tracks == 1 else f'''Multiple tracks format (if num_tracks > 1):
+"music": {{
+    "tracks": [
+        {{
+            "start": 0,
+            "end": length_a,
+            "style": "<one of: Classical, Hip Hop, Pop, Electronic, Meme>",
+            "intensity": "<analyzed intensity>",
+            "sentiment": "<one word from: {', '.join(sentiment_list)}>"
+        }},
+        {{
+            "start": length_a,
+            "end": length_b,
+            "style": "<different style from above>",
+            "intensity": "<analyzed intensity>",
+            "sentiment": "<different sentiment from above>"
+        }},
+        ...
+        {{
+            "start": length_n,
+            "end": total_duration_of_included_segments (must be the lesser of {desired_length} and video length),
+            "style": "<style not repeated in other tracks>",
+            "intensity": "<analyzed intensity>",
+            "sentiment": "<sentiment not repeated in other tracks>"
+        }}
+    ]
+}}'''}
 
-**VERY IMPORTANT:**
-- VERY VERY IMPORTANT: The total duration of all segments where `"include": true` MUST NOT exceed {desired_length} seconds.
-- Only select the most meaningful scenes for inclusion.
-- Segments without "include": true will be ignored for the final cropped video and music generation.
-- For each track, the sentiment should be the single overall sentiment of the track, which should be a single word strictly from the following list: {sentiment_list}
+**Constraints for Music Tracks:**
+- The number of tracks must be exactly {num_tracks}.
+- The total duration of all tracks combined must equal the total duration of `"include": true` segments.
+- This duration must NOT exceed the lesser of the video length and {desired_length} seconds.
+- Track time ranges must not overlap.
+- All timestamps must be numeric values in seconds.
+- Each track must use a **unique combination** of `style` and `sentiment`.
+- Track sentiment must be a single word strictly from: {', '.join(sentiment_list)}.
 
-Return ONLY the JSON response following this exact format:
+---
+
+**General Rules:**
+- The combined duration of all `"include": true` segments must not exceed the lesser of {desired_length} and the total video length.
+- Segments must not overlap or leave gaps between included portions.
+- Use only the most emotionally or narratively meaningful scenes.
+- All timestamps must be in numeric seconds (e.g., 14.5 — not "00:14").
+- Only use the full video if its total length is less than {desired_length}.
+
+**Also return:**
+- Full original video length (`video_length`)
+- Effective cropped video length (equal to total `"include": true` segment durations)
+- Overall mood/sentiment of the full video
+
+**IMPORTANT:**
+- Only segments marked `"include": true` are retained and used for music generation.
+- Music must reflect the dominant mood and pacing of selected segments.
+- Each music track must have a **distinct combination** of style and sentiment.
+- No commentary or explanation — return ONLY the final JSON using this exact format:
 {json.dumps(twelvelabs_output_schema, indent=4)}
 """

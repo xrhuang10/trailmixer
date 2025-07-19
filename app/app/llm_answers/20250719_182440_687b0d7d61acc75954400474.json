@@ -1,0 +1,73 @@
+{
+  "video_id": "Tom_and_Jerry_Trailer",
+  "video_title": "Tom & Jerry",
+  "video_description": "A trailer for the upcoming Tom and Jerry movie featuring live-action and animated characters in a big city hotel setting.",
+  "video_length": 153,
+  "overall_mood": "exciting",
+  "segments": [
+    {
+      "start_time": 7.0,
+      "end_time": 28.0,
+      "sentiment": "exciting",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 49.0,
+      "end_time": 60.0,
+      "sentiment": "exciting",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 89.0,
+      "end_time": 100.0,
+      "sentiment": "exciting",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 121.0,
+      "end_time": 130.0,
+      "sentiment": "exciting",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    }
+  ],
+  "music": {
+    "tracks": [
+      {
+        "start": 0,
+        "end": 28,
+        "style": "Pop",
+        "intensity": "high",
+        "sentiment": "exciting"
+      },
+      {
+        "start": 28,
+        "end": 60,
+        "style": "Pop",
+        "intensity": "medium",
+        "sentiment": "exciting"
+      },
+      {
+        "start": 60,
+        "end": 100,
+        "style": "Pop",
+        "intensity": "high",
+        "sentiment": "exciting"
+      },
+      {
+        "start": 100,
+        "end": 130,
+        "style": "Pop",
+        "intensity": "high",
+        "sentiment": "exciting"
+      }
+    ]
+  }
+}

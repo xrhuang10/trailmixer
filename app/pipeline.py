@@ -79,7 +79,7 @@ def process_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
             print("Some music file paths are invalid.")
             
         print("Step 3 complete!")
-        
+            
         # Get sentiment data as dictionary
         raw_data = job.sentiment_analysis.sentiment_analysis
         if isinstance(raw_data, str):

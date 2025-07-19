@@ -1,0 +1,100 @@
+{
+  "video_id": "Tom_and_Jerry_Trailer",
+  "video_title": "Tom & Jerry",
+  "video_description": "A trailer showcasing the adventures of Tom and Jerry in New York City, highlighting their rivalry and the chaos they bring to a luxurious hotel.",
+  "video_length": 153,
+  "overall_mood": "exciting",
+  "segments": [
+    {
+      "start_time": 7.0,
+      "end_time": 14.0,
+      "sentiment": "neutral",
+      "music_style": "upbeat",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 14.0,
+      "end_time": 28.0,
+      "sentiment": "positive",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 95.0,
+      "end_time": 100.0,
+      "sentiment": "exciting",
+      "music_style": "cinematic",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 100.0,
+      "end_time": 104.0,
+      "sentiment": "tense",
+      "music_style": "cinematic",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 104.0,
+      "end_time": 109.0,
+      "sentiment": "exciting",
+      "music_style": "cinematic",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 130.0,
+      "end_time": 133.0,
+      "sentiment": "dramatic",
+      "music_style": "cinematic",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 133.0,
+      "end_time": 137.0,
+      "sentiment": "dramatic",
+      "music_style": "cinematic",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 137.0,
+      "end_time": 140.0,
+      "sentiment": "dramatic",
+      "music_style": "cinematic",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 140.0,
+      "end_time": 145.0,
+      "sentiment": "dramatic",
+      "music_style": "cinematic",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 145.0,
+      "end_time": 149.0,
+      "sentiment": "dramatic",
+      "music_style": "cinematic",
+      "intensity": "high",
+      "include": true
+    }
+  ],
+  "music": {
+    "tracks": [
+      {
+        "start": 0,
+        "end": 60,
+        "style": "Pop",
+        "intensity": "medium",
+        "sentiment": "exciting"
+      }
+    ]
+  }
+}

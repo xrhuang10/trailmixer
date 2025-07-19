@@ -1,0 +1,114 @@
+{
+  "video_id": "hack_the_6ix",
+  "video_title": "Hackathon Event Highlights",
+  "video_description": "A compilation of scenes from a hackathon event, showcasing various activities and interactions.",
+  "video_length": 145,
+  "overall_mood": "energetic",
+  "segments": [
+    {
+      "start_time": 0,
+      "end_time": 7,
+      "sentiment": "exciting",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 11,
+      "end_time": 19,
+      "sentiment": "calm",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 34,
+      "end_time": 38,
+      "sentiment": "dramatic",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 41,
+      "end_time": 46,
+      "sentiment": "focused",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 60,
+      "end_time": 69,
+      "sentiment": "fun",
+      "music_style": "Pop",
+      "intensity": "low",
+      "include": true
+    },
+    {
+      "start_time": 105,
+      "end_time": 110,
+      "sentiment": "happy",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 120,
+      "end_time": 126,
+      "sentiment": "exciting",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 127,
+      "end_time": 130,
+      "sentiment": "happy",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 131,
+      "end_time": 135,
+      "sentiment": "exciting",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 136,
+      "end_time": 138,
+      "sentiment": "happy",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    }
+  ],
+  "music": {
+    "tracks": [
+      {
+        "start": 0,
+        "end": 19,
+        "style": "Pop",
+        "intensity": "high",
+        "sentiment": "exciting"
+      },
+      {
+        "start": 19,
+        "end": 46,
+        "style": "Pop",
+        "intensity": "medium",
+        "sentiment": "calm"
+      },
+      {
+        "start": 46,
+        "end": 60,
+        "style": "Pop",
+        "intensity": "low",
+        "sentiment": "fun"
+      }
+    ]
+  }
+}
