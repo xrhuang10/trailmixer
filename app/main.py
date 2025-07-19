@@ -1,30 +1,41 @@
-import uuid
 import os
+import uuid
 from typing import Dict
+
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse
 
+from app.twelvelabs_client import upload_video_to_twelvelabs
+
 app = FastAPI()
 
-# In-memory storage for job status (in production, use Redis or database)
 job_status: Dict[str, Dict] = {}
 
+# Main processing function
 def process_video_background(job_id: str, filename: str):
     """
-    Background task to simulate video processing pipeline:
-    1. Twelve Labs analysis
-    2. FFmpeg operations
+    Background task for video processing pipeline:
+    1. Twelve Labs analysis and indexing
+    2. FFmpeg operations (placeholder)
     """
     try:
         # Update status to processing
         job_status[job_id]["status"] = "processing"
-        job_status[job_id]["message"] = "Analyzing video with Twelve Labs..."
+        job_status[job_id]["message"] = "Uploading and analyzing video with Twelve Labs..."
         
-        # Simulate Twelve Labs analysis (replace with actual API call)
+        # Get file path from job status
+        file_path = job_status[job_id]["file_path"]
         
-        job_status[job_id]["message"] = "Running FFmpeg operations..."
+        # Upload to Twelve Labs for indexing
+        video_id = upload_video_to_twelvelabs(file_path, filename)
         
-        # Simulate FFmpeg processing (replace with actual FFmpeg operations)
+        # Update job status with Twelve Labs video ID
+        job_status[job_id]["twelve_labs_video_id"] = video_id
+        job_status[job_id]["message"] = "Twelve Labs indexing completed. Running FFmpeg operations..."
+        
+        # TODO: Add actual FFmpeg processing here
+        # This is where you would add your FFmpeg video processing logic
+        # Example: convert formats, extract thumbnails, etc.
         
         # Mark as completed
         job_status[job_id]["status"] = "completed"
@@ -34,6 +45,7 @@ def process_video_background(job_id: str, filename: str):
     except Exception as e:
         job_status[job_id]["status"] = "failed"
         job_status[job_id]["message"] = f"Processing failed: {str(e)}"
+        print(f"Background processing error for job {job_id}: {str(e)}")
 
 @app.post('/api/video/upload')
 def upload_video(background_tasks: BackgroundTasks, video_file: UploadFile = File(...)):
@@ -101,6 +113,18 @@ def get_job_status(job_id: str):
         raise HTTPException(status_code=404, detail="Job not found")
     
     return job_status[job_id]
+
+@app.get('/api/twelvelabs/config')
+def get_twelvelabs_config():
+    """
+    Get Twelve Labs configuration status.
+    """
+    return {
+        "api_key_configured": bool(TWELVE_LABS_API_KEY),
+        "index_id_configured": bool(TWELVE_LABS_INDEX_ID), 
+        "client_initialized": twelve_labs_client is not None,
+        "status": "ready" if (TWELVE_LABS_API_KEY and TWELVE_LABS_INDEX_ID) else "not_configured"
+    }
 
 @app.get('/video/processed/{video_filename}')
 def get_processed_video(video_filename: str):
