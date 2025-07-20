@@ -493,6 +493,8 @@ def upload_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
         sentiment_request = SentimentAnalysisRequest(video_id=video_id, prompt=extract_info_prompt)
         sentiment_result = analyze_sentiment_with_twelvelabs(sentiment_request)
         job.sentiment_analysis = sentiment_result
+        job.sentiment_data = sentiment_result.sentiment_analysis
+        job.segment_timestamps = sentiment_result.sentiment_analysis.segments
         
         if not sentiment_result.success:
             raise RuntimeError(f"Sentiment analysis failed for '{filename}': {sentiment_result.error_message}")

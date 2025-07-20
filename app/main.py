@@ -21,7 +21,7 @@ from models import (
 )
 
 # Import processing modules
-from pipeline import process_video_pipeline, process_multi_video_pipeline, upload_video_pipeline, stitch_videos_together
+from pipeline import stitch_videos_together, crop_and_stitch_video_segments, add_music_to_video, upload_video_pipeline
 from video_processor import extract_segments
 
 app = FastAPI(title="TrailMixer Video Processing API")
@@ -184,7 +184,7 @@ def upload_video(video_files: List[UploadFile] = File(...)):
             )
             
             # Use upload pipeline as helper function (runs steps 1-3)
-            # upload_video_pipeline(temp_job_id, temp_job_status)
+            upload_video_pipeline(temp_job_id, temp_job_status)
             
             # Get results from the pipeline
             temp_job = temp_job_status[temp_job_id]
@@ -364,202 +364,175 @@ class VideoProcessingTimestampsRequest(BaseModel):
     crop_settings: Optional[Dict[str, Any]] = Field(None, description="Video cropping settings")
     audio_settings: Optional[Dict[str, Any]] = Field(None, description="Audio processing settings")
 
-@app.post('/api/video/process/{job_id}')
-def process_video(job_id: str, request: VideoProcessingTimestampsRequest):
+@app.post('/api/video/crop')
+def crop_video(job_id: str):
     """
-    Create/recreate video with provided audio timestamps
-    Synchronous processing - can be called multiple times for the same job when user edits audio timestamps
+    Crop the video based on segment timestamps from sentiment analysis stored in job
     """
-    print(f"🎬 Creating video for job: {job_id}")
-    print(f"📊 Processing {len(request.timestamps)} timestamp segments")
-    print(f"🎵 Processing {len(request.music_file_paths)} music tracks")
+    # Check if job exists and has sentiment analysis
+    if job_id not in job_status:
+        raise HTTPException(status_code=404, detail="Job not found. Must upload and analyze video first.")
     
-    # Validate input
-    if not request.timestamps:
-        raise HTTPException(status_code=400, detail="No timestamps provided for processing")
+    job = job_status[job_id]
+    if not job.sentiment_analysis or not job.sentiment_analysis.file_path:
+        raise HTTPException(status_code=400, detail="No sentiment analysis found. Must complete video analysis first.")
     
-    # Get upload results to find the source video
+    # Get upload results to find the stitched video
     if job_id not in upload_results:
-        raise HTTPException(status_code=404, detail="Job not found. Must upload video first.")
+        raise HTTPException(status_code=404, detail="Upload results not found.")
     
     upload_result = upload_results[job_id]
-    if not upload_result["success"]:
-        raise HTTPException(status_code=400, detail="Cannot process video - upload failed")
-    
-    # Get video info from upload results
     video_info = upload_result["videos"][0] if upload_result["videos"] else {}
-    source_video_path = video_info.get("file_path")
+    stitched_video_path = video_info.get("file_path")
     source_filename = video_info.get("filename", f"video_{job_id}.mp4")
     
-    if not source_video_path:
-        raise HTTPException(status_code=404, detail="Source video file path not found")
+    if not stitched_video_path or not os.path.exists(stitched_video_path):
+        raise HTTPException(status_code=404, detail="Stitched video file not found")
     
     try:
-        print(f"🎯 Starting synchronous video processing for job: {job_id}")
-        print(f"📁 Source video: {source_filename}")
-        print(f"📍 Source path: {source_video_path}")
+        print(f"✂️ Cropping video for job: {job_id}")
+        print(f"   📁 Stitched video: {source_filename}")
         
-        # Convert timestamps to the format expected by crop_and_stitch_video_segments
-        segments = []
-        for i, timestamp in enumerate(request.timestamps):
-            # Extract start and end times from the timestamp dict
-            # The timestamps might have different key names, so try common variations
-            start_time = timestamp.get('start_time', timestamp.get('start', 0))
-            end_time = timestamp.get('end_time', timestamp.get('end', 0))
-            
-            if isinstance(start_time, str):
-                # Convert time string to seconds if needed
-                start_time = float(start_time)
-            if isinstance(end_time, str):
-                end_time = float(end_time)
-            
-            segment = {
-                "start": start_time,
-                "end": end_time
+        # Extract segment timestamps from sentiment analysis
+        segment_timestamps = job.segment_timestamps
+        
+        if not segment_timestamps:
+            raise HTTPException(status_code=400, detail="No segment timestamps found in sentiment analysis")
+        
+        print(f"   📊 Using segments from analysis: {len(segment_timestamps)}")
+        for i, seg in enumerate(segment_timestamps):
+            start_time = seg.get('start_time', seg.get('start', 0))
+            end_time = seg.get('end_time', seg.get('end', 10))
+            print(f"       Segment {i+1}: {start_time}s - {end_time}s (duration: {end_time-start_time}s)")
+        
+        # Convert segment format if needed (ensure start/end keys)
+        normalized_segments = []
+        for seg in segment_timestamps:
+            normalized_seg = {
+                "start": seg.get('start_time', seg.get('start', 0)),
+                "end": seg.get('end_time', seg.get('end', 10))
             }
-            segments.append(segment)
-            
-            print(f"   📹 Segment {i+1}: {start_time}s - {end_time}s (duration: {end_time-start_time:.1f}s)")
-            print(f"       Sentiment: {timestamp.get('sentiment', 'unknown')}")
-            print(f"       Style: {timestamp.get('music_style', 'unknown')}")
+            normalized_segments.append(normalized_seg)
         
-        # Create output path for the processed video
-        output_filename = request.output_filename or f"{job_id}_processed.mp4"
-        output_path = f"../processed_videos/{output_filename}"
+        # Create output path for cropped video
+        os.makedirs("../processed_videos", exist_ok=True)
+        cropped_video_path = f"../processed_videos/{job_id}_cropped.mp4"
         
-        # Ensure output directory exists
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        
-        print(f"🎬 Cropping and stitching video segments...")
-        print(f"   📹 Input segments: {len(segments)}")
-        print(f"   📁 Output: {output_filename}")
-        
-        # Import and use the crop_and_stitch_video_segments function
-        from pipeline import crop_and_stitch_video_segments
-        
-        # Crop and stitch the video segments
-        final_video_path = crop_and_stitch_video_segments(
-            video_filepath=source_video_path,
-            segments=segments,
-            output_path=output_path
+        # Crop and stitch video segments using extracted timestamps
+        cropped_path = crop_and_stitch_video_segments(
+            video_filepath=stitched_video_path,
+            segments=normalized_segments,
+            output_path=cropped_video_path
         )
         
-        # TODO: Add background music processing and mixing
-        # After cropping and stitching, we need to:
-        # 1. Process audio tracks from request.music_file_paths
-        # 2. Apply volume, fade in/out, and timing adjustments  
-        # 3. Mix background audio with the cropped video audio
-        # 4. Apply audio effects and normalization
-        # This will require using FFmpeg to combine the cropped video with the selected music tracks
+        # Verify cropped output exists
+        if not os.path.exists(cropped_path):
+            raise RuntimeError("Cropped video was not created")
         
-        # Calculate total duration
-        total_duration = sum(seg["end"] - seg["start"] for seg in segments)
+        file_size = os.path.getsize(cropped_path)
+        print(f"✅ Video cropping completed successfully!")
+        print(f"   📁 Cropped video: {os.path.basename(cropped_path)}")
+        print(f"   📊 Size: {file_size / (1024*1024):.1f} MB")
         
-        # Create or update job status with results
-        if job_id not in job_status:
-            job_status[job_id] = JobInfo(
-                job_id=job_id,
-                status=JobStatus.COMPLETED,
-                message="Video processing completed with custom timestamps",
-                filename=source_filename,
-                file_path=source_video_path,
-                created_at=datetime.datetime.now().isoformat(),
-                twelve_labs_video_id=video_info.get('twelve_labs_video_id'),
-                sentiment_analysis=None,
-                processed_video={
-                    "output_path": final_video_path,
-                    "output_filename": output_filename,
-                    "segments_count": len(segments),
-                    "total_duration": total_duration,
-                    "processing_complete": True,
-                    "created_with_custom_timestamps": True
-                }
-            )
-        else:
-            # Update existing job
-            job = job_status[job_id]
-            job.status = JobStatus.COMPLETED
-            job.message = "Video processing completed with custom timestamps"
-            job.processed_video = {
-                "output_path": final_video_path,
-                "output_filename": output_filename,
-                "segments_count": len(segments),
-                "total_duration": total_duration,
-                "processing_complete": True,
-                "created_with_custom_timestamps": True
-            }
-        
-        print(f"✅ Video processing completed successfully for job: {job_id}")
-        print(f"   📁 Output: {os.path.basename(final_video_path)}")
-        print(f"   📊 Segments: {len(segments)}")
-        print(f"   ⏱️ Total duration: {total_duration:.1f}s")
+        # Update job status with cropped video info
+        job.status = JobStatus.PROCESSING
+        job.message = "Video cropping completed"
+        if not job.processed_video:
+            job.processed_video = {}
+        job.processed_video.update({
+            "cropped_video_path": cropped_path,
+            "cropped_filename": os.path.basename(cropped_path),
+            "segments_count": len(normalized_segments),
+            "total_duration": sum(seg["end"] - seg["start"] for seg in normalized_segments),
+            "segments_used": normalized_segments,
+            "cropping_complete": True
+        })
         
         return {
             "job_id": job_id,
-            "status": JobStatus.COMPLETED.value,
-            "message": f"Video processing completed with {len(segments)} segments",
-            "output_filename": output_filename,
-            "output_path": final_video_path,
-            "processing_details": {
-                "timestamp_segments": len(request.timestamps),
-                "segments_processed": len(segments),
-                "total_duration": total_duration,
-                "source_filename": source_filename
-            }
+            "status": "cropping_completed", 
+            "message": f"Video cropping completed with {len(normalized_segments)} segments from sentiment analysis",
+            "cropped_video_path": cropped_path,
+            "cropped_filename": os.path.basename(cropped_path),
+            "segments_processed": len(normalized_segments),
+            "segments_used": normalized_segments,
+            "total_duration": sum(seg["end"] - seg["start"] for seg in normalized_segments)
         }
         
     except Exception as e:
-        error_msg = f"Video processing failed: {str(e)}"
+        error_msg = f"Video cropping failed: {str(e)}"
         print(f"❌ {error_msg}")
-        
-        # Update job status with error
-        if job_id in job_status:
-            job_status[job_id].status = JobStatus.FAILED
-            job_status[job_id].message = error_msg
-        
         raise HTTPException(status_code=500, detail=error_msg)
 
-# @app.get('/api/video/download/{job_id}')
-# def download_processed_video(job_id: str):
-#     """
-#     Download the final processed video file
-#     """
-#     if job_id not in job_status:
-#         raise HTTPException(status_code=404, detail="Job not found")
-    
-#     job = job_status[job_id]
-    
-#     if job.status != JobStatus.COMPLETED:
-#         raise HTTPException(status_code=400, detail="Video processing not yet completed")
-    
-#     processed_data = job.processed_video
-#     if not processed_data or not os.path.exists(processed_data["output_path"]):
-#         raise HTTPException(status_code=404, detail="Processed video file not found")
-    
-#     return FileResponse(
-#         path=processed_data["output_path"],
-#         media_type='video/mp4',
-#         filename=f"processed_{job.filename}"
-#     )
-
-@app.get('/api/video/download/{job_id}')
-def download_processed_video(job_id: str):
+@app.post('/api/video/download/{job_id}')
+def download_processed_video(
+    job_id: str, 
+    audio_timestamps: Dict[str, Dict[str, Any]]
+):
     """
-    Download the final processed video file (mocked with speed video)
+    Download the final processed video file with music added to pre-cropped video
+    Requires video to be cropped first via /api/video/crop
     """
-    # Mock implementation - return a speed video from videos directory
-    mock_video_path = "../videos/speed.mp4"
+    # Check if video has been cropped first
+    if job_id not in job_status:
+        raise HTTPException(status_code=404, detail="Job not found. Must crop video first.")
     
-    if not os.path.exists(mock_video_path):
-        raise HTTPException(status_code=404, detail="Mock speed video file not found")
+    job = job_status[job_id]
+    if not job.processed_video or not job.processed_video.get("cropping_complete"):
+        raise HTTPException(status_code=400, detail="Video must be cropped first. Call /api/video/crop first.")
     
-    print(f"📥 Serving mock speed video for download: {job_id}")
+    # Get cropped video path from job status
+    cropped_video_path = job.processed_video.get("cropped_video_path")
+    if not cropped_video_path or not os.path.exists(cropped_video_path):
+        raise HTTPException(status_code=404, detail="Cropped video file not found")
     
-    return FileResponse(
-        path=mock_video_path,
-        media_type='video/mp4',
-        filename=f"processed_trailer_{job_id}.mp4"
-    )
+    try:
+        print(f"🎵 Adding music to cropped video for job: {job_id}")
+        print(f"   📁 Cropped video: {job.processed_video.get('cropped_filename')}")
+        print(f"   🎵 Audio timestamps: {len(audio_timestamps)}")
+        
+        # Create output path for final video
+        os.makedirs("../processed_videos", exist_ok=True)
+        final_video_path = f"../processed_videos/{job_id}_final.mp4"
+        
+        # Add music to the pre-cropped video
+        final_path = add_music_to_video(
+            video_filepath=cropped_video_path,
+            music_tracks=audio_timestamps,
+            output_path=final_video_path,
+            video_volume=0.8,  # Slightly lower video audio
+            music_volume=0.3   # Background music level
+        )
+        
+        # Update job status with final video info
+        job.status = JobStatus.COMPLETED
+        job.message = "Video processing completed with music"
+        job.processed_video.update({
+            "final_video_path": final_path,
+            "final_filename": os.path.basename(final_path),
+            "music_tracks_count": len(audio_timestamps),
+            "processing_complete": True
+        })
+        
+        # Verify final output exists
+        if not os.path.exists(final_path):
+            raise RuntimeError("Final processed video was not created")
+        
+        file_size = os.path.getsize(final_path)
+        print(f"✅ Music processing completed successfully!")
+        print(f"   📁 Final video: {os.path.basename(final_path)}")
+        print(f"   📊 Size: {file_size / (1024*1024):.1f} MB")
+        
+        return FileResponse(
+            path=final_path,
+            media_type='video/mp4',
+            filename=f"processed_trailer_{job_id}.mp4"
+        )
+        
+    except Exception as e:
+        error_msg = f"Music processing failed: {str(e)}"
+        print(f"❌ {error_msg}")
+        raise HTTPException(status_code=500, detail=error_msg)
 
 # Health check endpoint
 @app.get('/health')
