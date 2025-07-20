@@ -1,0 +1,24 @@
+{
+  "video_id": "1234567890",
+  "video_title": "Walk in the Wilderness",
+  "video_description": "A woman in a red dress and a man walk side-by-side down a dirt path between large rock formations. The sky is darkening.",
+  "video_length": 16.0,
+  "overall_mood": "Dramatic",
+  "segments": [
+    {
+      "start_time": 0.0,
+      "end_time": 16.0,
+      "sentiment": "Dramatic",
+      "music_style": "Pop",
+      "include": true
+    }
+  ],
+  "music": [
+    {
+      "start": 0.0,
+      "end": 16.0,
+      "style": "Pop",
+      "sentiment": "Dramatic"
+    }
+  ]
+}
