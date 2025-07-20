@@ -3,6 +3,99 @@ import json
 # with open("app/prompts/twelvelabs_output_schema.json", "r") as f:
 #     twelvelabs_output_schema = json.load(f)
 
+output_example = {
+  "video_id": "hack_the_6ix",
+  "video_title": "Hackathon Event Highlights",
+  "video_description": "A compilation of various activities at a hackathon event.",
+  "video_length": 145,
+  "overall_mood": "energetic",
+  "segments": [
+    {
+      "start_time": 0,
+      "end_time": 7,
+      "sentiment": "exciting",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": True
+    },
+    {
+      "start_time": 11,
+      "end_time": 18,
+      "sentiment": "calm",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": True
+    },
+    {
+      "start_time": 34,
+      "end_time": 40,
+      "sentiment": "energetic",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": True
+    },
+    {
+      "start_time": 58,
+      "end_time": 69,
+      "sentiment": "fun",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": True
+    },
+    {
+      "start_time": 105,
+      "end_time": 119,
+      "sentiment": "happy",
+      "music_style": "Pop",
+      "intensity": "low",
+      "include": True
+    },
+    {
+      "start_time": 123,
+      "end_time": 138,
+      "sentiment": "sad",
+      "music_style": "Pop",
+      "intensity": "low",
+      "include": True
+    }
+  ],
+  "music": {
+    "tracks": [
+      {
+        "start": 0,
+        "end": 17,
+        "style": "Pop",
+        "intensity": "high",
+        "sentiment": "exciting"
+      },
+      {
+        "start": 17,
+        "end": 38,
+        "style": "Pop",
+        "intensity": "medium",
+        "sentiment": "calm"
+      },
+      {
+        "start": 38,
+        "end": 60,
+        "style": "Pop",
+        "intensity": "high",
+        "sentiment": "energetic"
+      }
+    ]
+  }
+}
+
+
+one_shot_example = f"""
+Example:
+You are given a video with a length of 145 seconds and a desired trailer length of 60 seconds.
+Your answer can follow this format:
+{output_example}
+because the sum of all the segment durations == the sum of all the track durations == the user's desired length of 60 seconds.
+
+"""
+
 twelvelabs_output_schema = {
     "video_id": {
         "type": "string",
@@ -81,9 +174,9 @@ sentiment_list = ["happy", "sad", "energetic", "calm", "dramatic", "romantic", "
 extract_info_prompt = f"""
 You are a professional video analyst that extracts information from videos for automated music mixing and editing.
 
-You will be given a video and must:
+You will be given a video and a desired trailer length of {desired_length} seconds and must:
 1. Analyze and break it into logical segments based on mood, content, or scene/highlight changes.
-2. Select the most important segments to KEEP, such that the total cropped duration is the **lesser of** the video length and approximately {desired_length} seconds (allow a few seconds of flexibility for clean scene transitions).
+2. Select the most important segments to KEEP, such that the total cropped duration approximately equal to the desired trailer length of {desired_length} seconds. Note that the individual segment and tracks may vary in duration, as long as their sums add up.
 3. Propose {num_tracks} suitable music track(s) based on the mood and pacing of the selected segments.
 
 Each segment must include:
@@ -93,6 +186,8 @@ Each segment must include:
 - "music_style": strictly "{music_style}"
 - "intensity": one of ["low", "medium", "high"]
 - "include": true or false (true if segment is included in the cropped final video)
+
+The end_time - start_time of each segment is the segment's duration. All segment durations added together must be equal to the desired trailer length of {desired_length} seconds. Note that the individual segment and individual track durations may vary in duration, as long as their sums add up.
 
 ---
 
@@ -141,8 +236,7 @@ Use the following structure for the `"music"` object:
 
 **Constraints for Music Tracks:**
 - The number of tracks must be exactly {num_tracks}.
-- The total duration of all tracks combined must equal the total duration of `"include": true` segments.
-- This duration must NOT exceed the lesser of the video length and the user's desired length of {desired_length} seconds.
+- The total duration of all tracks combined must be around the user's desired length of {desired_length} seconds.
 - Track time ranges must not overlap.
 - All timestamps must be numeric values in seconds.
 - Each track must use a **unique combination** of `style` and `sentiment`.
@@ -151,23 +245,25 @@ Use the following structure for the `"music"` object:
 ---
 
 **General Rules:**
-- The combined duration of all `"include": true` segments must not exceed the lesser of {desired_length} and the total video length. The sum of all the durations (end_time - start_time) of all the segments will therefore be around {desired_length} seconds.
 - Segments must not overlap or leave gaps between included portions.
-- Use only the most emotionally or narratively meaningful scenes.
+- Use the most emotionally or narratively meaningful scenes, BUT ABOVE ALL, make sure the total sum of durations of all the segments equals the user's desired length of {desired_length} seconds.
+- Prioritize time over meaningfulness. This means you can drop some segments or add some segments, even if they are not meaningful, as long as doing so will get to the desired length of {desired_length} seconds.
 - All timestamps must be in numeric seconds (e.g., 14.5 — not "00:14").
 - Only use the full video if its total length is less than the user's desired length of {desired_length} seconds.
 
 **Also return:**
-- Full original video length (`video_length`)
-- Effective cropped video length (equal to total `"include": true` segment durations)
+- Full original video length
+- Effective cropped video length
 - Overall mood/sentiment of the full video
 
+
 **IMPORTANT:**
-- Only segments marked `"include": true` are retained and used for music generation. Therefore, the sum of all the durations (end_time - start_time) of all the segments will be around the user's desired length of {desired_length} seconds.
+- The sum of all the segment durations == the sum of all the track durations == the user's desired length of {desired_length} seconds. Note that the individual segment and individual track durations may vary in duration, as long as their sums add up. 
 - Music must reflect the dominant mood and pacing of selected segments.
 - Each music track must have a **distinct combination** of style and sentiment.
-- Your #1 priority is to create a list of segments whose total sum of durations (end_time - start_time) equals the user's desired length of {desired_length} seconds, even if that means incorporating less meaningful segments. The sum of all the music track durations will also be around the user's desired length of {desired_length} seconds.
-- No commentary or explanation — return ONLY the final JSON using this exact format:
+- Your #1 priority is to create a list of segments whose total sum of durations (end_time - start_time) equals the user's desired length of {desired_length} seconds, even if that means incorporating less meaningful segments. The sum of all the music track durations will also be around the user's desired length of {desired_length} seconds. 
+- Note that the individual segment and individual track durations may vary in duration, as long as their sums add up.
+- You must return ONLY the final JSON using this exact format with no additional text:
 
 {json.dumps(twelvelabs_output_schema, indent=4)}
 
