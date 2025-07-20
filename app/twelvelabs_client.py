@@ -48,7 +48,7 @@ def upload_video_to_twelvelabs(file_path: str) -> Optional[str]:
         
         # Wait for the task to complete with status updates
         def on_task_update(task: Task):
-            print(f"Twelve Labs Status: {task.status}")
+            print(f"Twelve Labs Indexing Status: {task.status}")
         
         # Hang until the task is done
         task.wait_for_done(callback=on_task_update)
@@ -151,17 +151,23 @@ def export_to_json_file(cleaned_data: Dict[str, Any], filename: str) -> str:
 # For testing
 if __name__ == "__main__":
     # upload_video_to_twelvelabs("..\\files\\speed.mp4")
-    response = prompt_twelvelabs("687b0d7d61acc75954400474", extract_info_prompt)
+    response = prompt_twelvelabs("687c606261acc75954402451", extract_info_prompt)
     if response:
+        try:
         # Get cleaned data
         
-        cleaned_json = clean_llm_string_output_to_json(response.data)
-        print(f"Cleaned JSON: {cleaned_json}")
-        video_title = cleaned_json["video_title"]
-        
-        # Use timestamp_video_id format instead of video title to avoid special characters
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        video_id = "687b0d7d61acc75954400474"  # Use actual video_id from the test
-        exported_file = export_to_json_file(cleaned_json, f"{timestamp}_{video_id}.json")
-        if exported_file:
-            print(f"📁 File saved to: {exported_file}")
+            cleaned_json = clean_llm_string_output_to_json(response.data)
+            print(f"Cleaned JSON: {cleaned_json}")
+            video_title = cleaned_json["video_title"]
+            
+            # Use timestamp_video_id format instead of video title to avoid special characters
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            video_id = "687c606261acc75954402451"  # Use actual video_id from the test
+            exported_file = export_to_json_file(cleaned_json, f"{timestamp}_{video_id}.json")
+            if exported_file:
+                print(f"📁 File saved to: {exported_file}")
+        except Exception as e:
+            print(f"❌ Error exporting to JSON: {e}", "\n", "Response: ", response.data)
+
+    
+    

@@ -1,0 +1,250 @@
+{
+  "video_id": "Hack the 6ix",
+  "video_title": "Hackathon Event Highlights",
+  "video_description": "A compilation of various activities at a hackathon event.",
+  "video_length": 145,
+  "overall_mood": "Energetic",
+  "segments": [
+    {
+      "start_time": 0,
+      "end_time": 7,
+      "sentiment": "Exciting",
+      "music_style": "Pop",
+      "intensity": "High",
+      "include": true
+    },
+    {
+      "start_time": 11,
+      "end_time": 14,
+      "sentiment": "Calm",
+      "music_style": "Pop",
+      "intensity": "Low",
+      "include": true
+    },
+    {
+      "start_time": 14,
+      "end_time": 19,
+      "sentiment": "Energetic",
+      "music_style": "Pop",
+      "intensity": "Medium",
+      "include": true
+    },
+    {
+      "start_time": 28,
+      "end_time": 31,
+      "sentiment": "Focused",
+      "music_style": "Pop",
+      "intensity": "Low",
+      "include": true
+    },
+    {
+      "start_time": 31,
+      "end_time": 34,
+      "sentiment": "Engaged",
+      "music_style": "Pop",
+      "intensity": "Medium",
+      "include": true
+    },
+    {
+      "start_time": 34,
+      "end_time": 37,
+      "sentiment": "Inspiring",
+      "music_style": "Pop",
+      "intensity": "High",
+      "include": true
+    },
+    {
+      "start_time": 40,
+      "end_time": 43,
+      "sentiment": "Collaborative",
+      "music_style": "Pop",
+      "intensity": "Medium",
+      "include": true
+    },
+    {
+      "start_time": 43,
+      "end_time": 46,
+      "sentiment": "Concentrated",
+      "music_style": "Pop",
+      "intensity": "Low",
+      "include": true
+    },
+    {
+      "start_time": 58,
+      "end_time": 62,
+      "sentiment": "Fun",
+      "music_style": "Pop",
+      "intensity": "Medium",
+      "include": true
+    },
+    {
+      "start_time": 62,
+      "end_time": 67,
+      "sentiment": "Playful",
+      "music_style": "Pop",
+      "intensity": "Low",
+      "include": true
+    },
+    {
+      "start_time": 67,
+      "end_time": 70,
+      "sentiment": "Creative",
+      "music_style": "Pop",
+      "intensity": "Medium",
+      "include": true
+    },
+    {
+      "start_time": 70,
+      "end_time": 73,
+      "sentiment": "Competitive",
+      "music_style": "Pop",
+      "intensity": "High",
+      "include": true
+    },
+    {
+      "start_time": 73,
+      "end_time": 76,
+      "sentiment": "Focused",
+      "music_style": "Pop",
+      "intensity": "Low",
+      "include": true
+    },
+    {
+      "start_time": 76,
+      "end_time": 79,
+      "sentiment": "Social",
+      "music_style": "Pop",
+      "intensity": "Medium",
+      "include": true
+    },
+    {
+      "start_time": 80,
+      "end_time": 83,
+      "sentiment": "Casual",
+      "music_style": "Pop",
+      "intensity": "Low",
+      "include": true
+    },
+    {
+      "start_time": 83,
+      "end_time": 86,
+      "sentiment": "Interactive",
+      "music_style": "Pop",
+      "intensity": "Medium",
+      "include": true
+    },
+    {
+      "start_time": 86,
+      "end_time": 89,
+      "sentiment": "Informative",
+      "music_style": "Pop",
+      "intensity": "Low",
+      "include": true
+    },
+    {
+      "start_time": 90,
+      "end_time": 94,
+      "sentiment": "Entertained",
+      "music_style": "Pop",
+      "intensity": "Medium",
+      "include": true
+    },
+    {
+      "start_time": 94,
+      "end_time": 97,
+      "sentiment": "Innovative",
+      "music_style": "Pop",
+      "intensity": "High",
+      "include": true
+    },
+    {
+      "start_time": 97,
+      "end_time": 100,
+      "sentiment": "Curious",
+      "music_style": "Pop",
+      "intensity": "Low",
+      "include": true
+    },
+    {
+      "start_time": 100,
+      "end_time": 103,
+      "sentiment": "Reflective",
+      "music_style": "Pop",
+      "intensity": "Medium",
+      "include": true
+    },
+    {
+      "start_time": 103,
+      "end_time": 106,
+      "sentiment": "Confident",
+      "music_style": "Pop",
+      "intensity": "High",
+      "include": true
+    },
+    {
+      "start_time": 106,
+      "end_time": 109,
+      "sentiment": "Amused",
+      "music_style": "Pop",
+      "intensity": "Low",
+      "include": true
+    },
+    {
+      "start_time": 109,
+      "end_time": 112,
+      "sentiment": "Empowered",
+      "music_style": "Pop",
+      "intensity": "Medium",
+      "include": true
+    },
+    {
+      "start_time": 112,
+      "end_time": 115,
+      "sentiment": "Determined",
+      "music_style": "Pop",
+      "intensity": "High",
+      "include": true
+    },
+    {
+      "start_time": 115,
+      "end_time": 118,
+      "sentiment": "Inspired",
+      "music_style": "Pop",
+      "intensity": "Low",
+      "include": true
+    },
+    {
+      "start_time": 118,
+      "end_time": 121,
+      "sentiment": "Motivated",
+      "music_style": "Pop",
+      "intensity": "Medium",
+      "include": true
+    }
+  ],
+  "music": {
+    "tracks": [
+      {
+        "start": 0,
+        "end": 20,
+        "style": "Pop",
+        "intensity": "High",
+        "sentiment": "Energetic"
+      },
+      {
+        "start": 20,
+        "end": 40,
+        "style": "Pop",
+        "intensity": "Medium",
+        "sentiment": "Focused"
+      },
+      {
+        "start": 40,
+        "end": 60,
+        "style": "Pop",
+        "intensity": "Low",
+        "sentiment": "Fun"
+      }
+    ]
+  }
+}

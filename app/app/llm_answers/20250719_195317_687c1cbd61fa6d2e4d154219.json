@@ -1,0 +1,119 @@
+{
+  "video_id": "123456",
+  "video_title": "HACK THE 6IX Event Highlights",
+  "video_description": "A compilation of highlights from the HACK THE 6IX event, showcasing various activities, presentations, and team-building exercises.",
+  "video_length": 145,
+  "overall_mood": "energetic",
+  "segments": [
+    {
+      "start_time": 0,
+      "end_time": 10,
+      "sentiment": "excited",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 15,
+      "end_time": 30,
+      "sentiment": "engaged",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 35,
+      "end_time": 50,
+      "sentiment": "focused",
+      "music_style": "Pop",
+      "intensity": "low",
+      "include": true
+    },
+    {
+      "start_time": 55,
+      "end_time": 70,
+      "sentiment": "energetic",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 75,
+      "end_time": 90,
+      "sentiment": "entertained",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 95,
+      "end_time": 110,
+      "sentiment": "happy",
+      "music_style": "Pop",
+      "intensity": "low",
+      "include": true
+    },
+    {
+      "start_time": 115,
+      "end_time": 130,
+      "sentiment": "dramatic",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 135,
+      "end_time": 145,
+      "sentiment": "calm",
+      "music_style": "Pop",
+      "intensity": "low",
+      "include": true
+    }
+  ],
+  "music": {
+    "tracks": [
+      {
+        "start": 0,
+        "end": 30,
+        "style": "Pop",
+        "intensity": "high",
+        "sentiment": "excited"
+      },
+      {
+        "start": 30,
+        "end": 75,
+        "style": "Pop",
+        "intensity": "medium",
+        "sentiment": "engaged"
+      },
+      {
+        "start": 75,
+        "end": 90,
+        "style": "Pop",
+        "intensity": "low",
+        "sentiment": "focused"
+      },
+      {
+        "start": 90,
+        "end": 120,
+        "style": "Pop",
+        "intensity": "high",
+        "sentiment": "energetic"
+      },
+      {
+        "start": 120,
+        "end": 135,
+        "style": "Pop",
+        "intensity": "medium",
+        "sentiment": "entertained"
+      },
+      {
+        "start": 135,
+        "end": 150,
+        "style": "Pop",
+        "intensity": "low",
+        "sentiment": "happy"
+      }
+    ]
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "video_id": "123456",
+  "video_title": "Hack the 6IX Event Highlights",
+  "video_description": "Highlights from the Hack the 6IX event, showcasing attendees, presentations, team-building activities, and award ceremonies.",
+  "video_length": 145,
+  "overall_mood": "energetic",
+  "segments": [
+    {
+      "start_time": 0,
+      "end_time": 20,
+      "sentiment": "energetic",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 23,
+      "end_time": 40,
+      "sentiment": "calm",
+      "music_style": "Pop",
+      "intensity": "low",
+      "include": true
+    },
+    {
+      "start_time": 41,
+      "end_time": 60,
+      "sentiment": "happy",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 61,
+      "end_time": 80,
+      "sentiment": "energetic",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 83,
+      "end_time": 100,
+      "sentiment": "calm",
+      "music_style": "Pop",
+      "intensity": "low",
+      "include": true
+    },
+    {
+      "start_time": 101,
+      "end_time": 120,
+      "sentiment": "happy",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 121,
+      "end_time": 140,
+      "sentiment": "energetic",
+      "music_style": "Pop",
+      "intensity": "high",
+      "include": true
+    }
+  ],
+  "music": {
+    "tracks": [
+      {
+        "start": 0,
+        "end": 20,
+        "style": "Pop",
+        "intensity": "high",
+        "sentiment": "energetic"
+      },
+      {
+        "start": 20,
+        "end": 40,
+        "style": "Pop",
+        "intensity": "low",
+        "sentiment": "calm"
+      },
+      {
+        "start": 40,
+        "end": 60,
+        "style": "Pop",
+        "intensity": "medium",
+        "sentiment": "happy"
+      }
+    ]
+  }
+}
