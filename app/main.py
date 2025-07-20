@@ -366,9 +366,6 @@ def process_video(job_id: str, request: VideoProcessingTimestampsRequest):
     if not request.timestamps:
         raise HTTPException(status_code=400, detail="No timestamps provided for processing")
     
-    if not request.music_file_paths:
-        raise HTTPException(status_code=400, detail="No music file paths provided for processing")
-    
     # Get upload results to find the source video
     if job_id not in upload_results:
         raise HTTPException(status_code=404, detail="Job not found. Must upload video first.")
@@ -380,84 +377,71 @@ def process_video(job_id: str, request: VideoProcessingTimestampsRequest):
     # Get video info from upload results
     video_info = upload_result["videos"][0] if upload_result["videos"] else {}
     source_video_path = video_info.get("file_path")
+    source_filename = video_info.get("filename", f"video_{job_id}.mp4")
+    
     if not source_video_path:
         raise HTTPException(status_code=404, detail="Source video file path not found")
     
     try:
         print(f"🎯 Starting synchronous video processing for job: {job_id}")
-        print(f"📁 Source video: {video_info.get('filename', 'unknown')}")
+        print(f"📁 Source video: {source_filename}")
+        print(f"📍 Source path: {source_video_path}")
         
-        # TODO: Implement video cropping logic
-        # Extract specific time segments from the original video based on timestamps
-        # Use FFmpeg to crop video segments: ffmpeg -i input.mp4 -ss START_TIME -t DURATION -c copy output_segment.mp4
-        cropped_clips = []
+        # Convert timestamps to the format expected by crop_and_stitch_video_segments
+        segments = []
         for i, timestamp in enumerate(request.timestamps):
-            start_time = timestamp.get('start_time', 0)
-            end_time = timestamp.get('end_time', 0)
-            duration = end_time - start_time
+            # Extract start and end times from the timestamp dict
+            # The timestamps might have different key names, so try common variations
+            start_time = timestamp.get('start_time', timestamp.get('start', 0))
+            end_time = timestamp.get('end_time', timestamp.get('end', 0))
             
-            print(f"   📹 Clip {i+1}: {start_time}s - {end_time}s (duration: {duration}s)")
+            if isinstance(start_time, str):
+                # Convert time string to seconds if needed
+                start_time = float(start_time)
+            if isinstance(end_time, str):
+                end_time = float(end_time)
+            
+            segment = {
+                "start": start_time,
+                "end": end_time
+            }
+            segments.append(segment)
+            
+            print(f"   📹 Segment {i+1}: {start_time}s - {end_time}s (duration: {end_time-start_time:.1f}s)")
             print(f"       Sentiment: {timestamp.get('sentiment', 'unknown')}")
             print(f"       Style: {timestamp.get('music_style', 'unknown')}")
-            
-            cropped_clip = {
-                "clip_index": i,
-                "source_file": source_video_path,
-                "start_time": start_time,
-                "end_time": end_time,
-                "duration": duration,
-                "temp_output": f"temp_clip_{i}_{job_id}.mp4",
-                "sentiment": timestamp.get('sentiment', 'unknown'),
-                "music_style": timestamp.get('music_style', 'unknown')
-            }
-            cropped_clips.append(cropped_clip)
         
-        print(f"✅ Prepared {len(cropped_clips)} video clips for processing")
-        
-        # TODO: Implement audio processing and synchronization
-        # Process audio tracks to match the video segments timing
-        # Apply volume, fade in/out, and timing adjustments
-        processed_audio = []
-        for audio_file, timing_info in request.music_file_paths.items():
-            start_time = timing_info.get('start', 0)
-            end_time = timing_info.get('end', 0)
-            volume = timing_info.get('volume', 0.3)
-            
-            print(f"   🎵 Audio: {audio_file}")
-            print(f"       Timing: {start_time}s - {end_time}s")
-            print(f"       Volume: {volume}")
-            
-            audio_segment = {
-                "audio_file": audio_file,
-                "start_time": start_time,
-                "end_time": end_time,
-                "duration": end_time - start_time,
-                "volume": volume,
-                "fade_in": timing_info.get('fade_in', '0.5'),
-                "fade_out": timing_info.get('fade_out', '0.5')
-            }
-            processed_audio.append(audio_segment)
-        
-        print(f"✅ Prepared {len(processed_audio)} audio segments for processing")
-        
-        # TODO: Implement final video assembly and stitching
-        # 1. Crop video segments using FFmpeg based on timestamps
-        # 2. Prepare audio tracks with proper timing and effects
-        # 3. Concatenate video clips in sequence
-        # 4. Mix background audio with video audio
-        # 5. Apply transitions and effects between segments
-        # 6. Render final output video
-        
-        output_filename = request.output_filename or f"{job_id}_final.mp4"
+        # Create output path for the processed video
+        output_filename = request.output_filename or f"{job_id}_processed.mp4"
         output_path = f"../processed_videos/{output_filename}"
         
-        print(f"🎬 TODO: Final video assembly")
-        print(f"   📹 Input clips: {len(cropped_clips)}")
-        print(f"   🎵 Audio tracks: {len(processed_audio)}")
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        print(f"🎬 Cropping and stitching video segments...")
+        print(f"   📹 Input segments: {len(segments)}")
         print(f"   📁 Output: {output_filename}")
         
+        # Import and use the crop_and_stitch_video_segments function
+        from pipeline import crop_and_stitch_video_segments
+        
+        # Crop and stitch the video segments
+        final_video_path = crop_and_stitch_video_segments(
+            video_filepath=source_video_path,
+            segments=segments,
+            output_path=output_path
+        )
+        
+        # TODO: Add background music processing and mixing
+        # After cropping and stitching, we need to:
+        # 1. Process audio tracks from request.music_file_paths
+        # 2. Apply volume, fade in/out, and timing adjustments  
+        # 3. Mix background audio with the cropped video audio
+        # 4. Apply audio effects and normalization
+        # This will require using FFmpeg to combine the cropped video with the selected music tracks
+        
         # Calculate total duration
-        total_duration = sum(clip["duration"] for clip in cropped_clips)
+        total_duration = sum(seg["end"] - seg["start"] for seg in segments)
         
         # Create or update job status with results
         if job_id not in job_status:
@@ -465,16 +449,15 @@ def process_video(job_id: str, request: VideoProcessingTimestampsRequest):
                 job_id=job_id,
                 status=JobStatus.COMPLETED,
                 message="Video processing completed with custom timestamps",
-                filename=video_info.get('filename', f"video_{job_id}.mp4"),
+                filename=source_filename,
                 file_path=source_video_path,
                 created_at=datetime.datetime.now().isoformat(),
                 twelve_labs_video_id=video_info.get('twelve_labs_video_id'),
                 sentiment_analysis=None,
                 processed_video={
-                    "output_path": output_path,
+                    "output_path": final_video_path,
                     "output_filename": output_filename,
-                    "cropped_clips": cropped_clips,
-                    "audio_segments": processed_audio,
+                    "segments_count": len(segments),
                     "total_duration": total_duration,
                     "processing_complete": True,
                     "created_with_custom_timestamps": True
@@ -486,28 +469,30 @@ def process_video(job_id: str, request: VideoProcessingTimestampsRequest):
             job.status = JobStatus.COMPLETED
             job.message = "Video processing completed with custom timestamps"
             job.processed_video = {
-                "output_path": output_path,
+                "output_path": final_video_path,
                 "output_filename": output_filename,
-                "cropped_clips": cropped_clips,
-                "audio_segments": processed_audio,
+                "segments_count": len(segments),
                 "total_duration": total_duration,
                 "processing_complete": True,
                 "created_with_custom_timestamps": True
             }
         
-        print(f"✅ Video processing completed synchronously for job: {job_id}")
+        print(f"✅ Video processing completed successfully for job: {job_id}")
+        print(f"   📁 Output: {os.path.basename(final_video_path)}")
+        print(f"   📊 Segments: {len(segments)}")
+        print(f"   ⏱️ Total duration: {total_duration:.1f}s")
         
         return {
             "job_id": job_id,
             "status": JobStatus.COMPLETED.value,
-            "message": f"Video processing completed with {len(cropped_clips)} clips and {len(processed_audio)} audio tracks",
+            "message": f"Video processing completed with {len(segments)} segments",
             "output_filename": output_filename,
+            "output_path": final_video_path,
             "processing_details": {
                 "timestamp_segments": len(request.timestamps),
-                "audio_tracks": len(request.music_file_paths),
+                "segments_processed": len(segments),
                 "total_duration": total_duration,
-                "cropped_clips": cropped_clips,
-                "audio_segments": processed_audio
+                "source_filename": source_filename
             }
         }
         
@@ -522,121 +507,46 @@ def process_video(job_id: str, request: VideoProcessingTimestampsRequest):
         
         raise HTTPException(status_code=500, detail=error_msg)
 
-@app.get('/api/video/timestamps/{job_id}', response_model=MusicTimestampsResponse)
-def get_music_timestamps(job_id: str):
-    """
-    Get music timestamps and processing results for uploaded video with resolved file paths
-    Call this after /api/video/upload to get the JSON metadata including actual music file paths
-    """
-    if job_id not in upload_results:
-        raise HTTPException(status_code=404, detail="Upload results not found for this job_id")
+# @app.get('/api/video/download/{job_id}')
+# def download_processed_video(job_id: str):
+#     """
+#     Download the final processed video file
+#     """
+#     if job_id not in job_status:
+#         raise HTTPException(status_code=404, detail="Job not found")
     
-    result = upload_results[job_id]
+#     job = job_status[job_id]
     
-    print(f"🎵 Returning music timestamps for job: {job_id}")
-    print(f"   Videos processed: {result['video_count']}")
-    print(f"   Success: {result['success']}")
+#     if job.status != JobStatus.COMPLETED:
+#         raise HTTPException(status_code=400, detail="Video processing not yet completed")
     
-    # The music_file_paths are already resolved by upload_video_pipeline -> get_music_file_paths()
-    # No need to recreate the logic - just return the pre-resolved file paths
-    for video in result["videos"]:
-        if video.get("music_file_paths") and video.get("audio_selection_complete"):
-            print(f"   🎵 Video: {video['filename']}")
-            print(f"       Music tracks with resolved file paths: {len(video['music_file_paths'])}")
-            
-            # Log the resolved file paths for debugging
-            for track_name, track_info in video["music_file_paths"].items():
-                if isinstance(track_info, dict) and 'start' in track_info:
-                    start_time = track_info.get('start', 0)
-                    end_time = track_info.get('end', 0)
-                    duration = end_time - start_time
-                    print(f"       🎼 {track_name}: {start_time}s-{end_time}s ({duration:.1f}s)")
-                    # track_name is already the resolved file path from get_music_file_paths()
-                    print(f"           File: {track_name}")
-                    print(f"           Exists: {'✓' if os.path.exists(track_name) else '✗'}")
-        else:
-            print(f"   ⚠️ Video: {video['filename']} - No resolved music file paths")
+#     processed_data = job.processed_video
+#     if not processed_data or not os.path.exists(processed_data["output_path"]):
+#         raise HTTPException(status_code=404, detail="Processed video file not found")
     
-    # Extract filepath from the first video result
-    main_filepath = None
-    if result["videos"] and len(result["videos"]) > 0:
-        main_filepath = result["videos"][0].get("file_path")
-    
-    return MusicTimestampsResponse(
-        job_id=result["job_id"],
-        video_count=result["video_count"],
-        videos=result["videos"],
-        success=result["success"],
-        message=result["message"],
-        filepath=main_filepath
-    )
-
-@app.get('/api/video/status/{job_id}')
-def get_processing_status(job_id: str):
-    """
-    Get current status of video processing job
-    """
-    if job_id not in job_status:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    job = job_status[job_id]
-    
-    return {
-        "job_id": job.job_id,
-        "status": job.status,
-        "message": job.message,
-        "filename": job.filename,
-        "created_at": job.created_at,
-        "twelve_labs_video_id": job.twelve_labs_video_id,
-        "processed_video": job.processed_video
-    }
+#     return FileResponse(
+#         path=processed_data["output_path"],
+#         media_type='video/mp4',
+#         filename=f"processed_{job.filename}"
+#     )
 
 @app.get('/api/video/download/{job_id}')
 def download_processed_video(job_id: str):
     """
-    Download the final processed video file
+    Download the final processed video file (mocked with speed video)
     """
-    if job_id not in job_status:
-        raise HTTPException(status_code=404, detail="Job not found")
+    # Mock implementation - return a speed video from videos directory
+    mock_video_path = "videos/speed.mp4"
     
-    job = job_status[job_id]
+    if not os.path.exists(mock_video_path):
+        raise HTTPException(status_code=404, detail="Mock speed video file not found")
     
-    if job.status != JobStatus.COMPLETED:
-        raise HTTPException(status_code=400, detail="Video processing not yet completed")
-    
-    processed_data = job.processed_video
-    if not processed_data or not os.path.exists(processed_data["output_path"]):
-        raise HTTPException(status_code=404, detail="Processed video file not found")
+    print(f"📥 Serving mock speed video for download: {job_id}")
     
     return FileResponse(
-        path=processed_data["output_path"],
+        path=mock_video_path,
         media_type='video/mp4',
-        filename=f"processed_{job.filename}"
-    )
-
-
-
-@app.get('/api/video/stream/{job_id}')
-def stream_processed_video(job_id: str):
-    """
-    Stream the processed video for in-browser playback
-    """
-    if job_id not in job_status:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    job = job_status[job_id]
-    
-    if job.status != JobStatus.COMPLETED:
-        raise HTTPException(status_code=400, detail="Video processing not yet completed")
-    
-    processed_data = job.processed_video
-    if not processed_data or not os.path.exists(processed_data["output_path"]):
-        raise HTTPException(status_code=404, detail="Processed video file not found")
-    
-    return FileResponse(
-        path=processed_data["output_path"],
-        media_type='video/mp4',
-        headers={"Accept-Ranges": "bytes"}
+        filename=f"processed_trailer_{job_id}.mp4"
     )
 
 # Health check endpoint

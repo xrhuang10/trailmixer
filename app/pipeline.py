@@ -646,7 +646,7 @@ if __name__ == "__main__":
     filename = '../videos/tom_and_jerry_trailer_no_music.mp4'
     output_path = '../processed_videos/tom_and_jerry.mp4'
     
-    crop_and_stitch_video_segments(filename, example_timestamps, output_path)
+    path = crop_and_stitch_video_segments(filename, example_timestamps, output_path)
     
     print(f"✅ Video processing completed successfully for '{filename}'!")
     print(f"   📁 Output: {os.path.basename(output_path)}")
