@@ -10,6 +10,8 @@ from models import (
     VideoProcessingRequest, VideoProcessingResult, AudioPickingRequest, AudioLibrary,
     VideoAnalysisResult, AudioSelection, VideoSegmentWithAudio
 )
+import subprocess
+
 
 # Import Twelve Labs functions
 from twelvelabs_client import upload_video_to_twelvelabs, prompt_twelvelabs, clean_llm_string_output_to_json, export_to_json_file
@@ -390,3 +392,16 @@ def process_single_video_in_batch(video_result: VideoAnalysisResult, audio_libra
         video_result.success = False
         video_result.error_message = str(e)
         return video_result 
+
+def convert_mov_to_mp4(input_path: str) -> str:
+    """Convert a .mov video file to .mp4 using ffmpeg. Returns the new .mp4 file path."""
+    output_path = input_path.rsplit('.', 1)[0] + ".mp4"
+    try:
+        # -y to overwrite output, -loglevel error to suppress ffmpeg output unless there's an error
+        subprocess.run([
+            "ffmpeg", "-y", "-i", input_path, "-c:v", "libx264", "-c:a", "aac", "-strict", "experimental", output_path
+        ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return output_path
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"FFmpeg conversion failed: {e.stderr.decode()}")
+

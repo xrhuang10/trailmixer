@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
+from video_processor import convert_mov_to_mp4
 # Import models
 from models import (
     VideoSegment, SentimentAnalysisData, SentimentAnalysisRequest, SentimentAnalysisResponse,
@@ -67,16 +68,30 @@ def upload_video(background_tasks: BackgroundTasks, video_files: List[UploadFile
         if not video_file.filename:
             raise HTTPException(status_code=400, detail=f"Filename for file {i+1} is required")
         
-        file_path = os.path.join(upload_dir, f"{job_id}_{video_file.filename}")
+        orig_filename = video_file.filename
+        file_path = os.path.join(upload_dir, f"{job_id}_{orig_filename}")
         try:
             with open(file_path, "wb") as buffer:
                 content = video_file.file.read()
                 buffer.write(content)
+            
+            # If it's a .mov, convert to .mp4 and use the new path
+            if orig_filename.lower().endswith('.mov'):
+                try:
+                    converted_path = convert_mov_to_mp4(file_path)
+                    os.remove(file_path)  # Optional: remove original .mov
+                    file_path = converted_path
+                    # Also update filename for the rest of the pipeline
+                    video_file.filename = os.path.basename(converted_path)
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=f"FFmpeg conversion failed: {str(e)}")
+            
             file_paths.append(file_path)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to save file {i+1}: {str(e)}")
         finally:
             video_file.file.close()
+
     
     # Choose processing approach based on number of videos
     if len(video_files) == 1:
