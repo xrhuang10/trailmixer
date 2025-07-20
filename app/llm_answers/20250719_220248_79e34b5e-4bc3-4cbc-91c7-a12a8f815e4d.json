@@ -1,0 +1,23 @@
+{
+  "video_id": "79e34b5e-4bc3-4cbc-91c7-a12a8f815e4d",
+  "video_title": "hack-the-6ix-promo-video.mp4",
+  "video_description": "Test video for pipeline",
+  "video_length": 60.0,
+  "overall_mood": "energetic",
+  "segments": [
+    {
+      "start_time": 0.0,
+      "end_time": 30.0,
+      "sentiment": "positive",
+      "music_style": "upbeat",
+      "intensity": "medium"
+    },
+    {
+      "start_time": 30.0,
+      "end_time": 60.0,
+      "sentiment": "calm",
+      "music_style": "ambient",
+      "intensity": "low"
+    }
+  ]
+}

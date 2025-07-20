@@ -1,0 +1,76 @@
+{
+  "video_id": "hackthe6ix",
+  "video_title": "Hackathon Event Highlights",
+  "video_description": "Highlights of a hackathon event showcasing various activities and presentations.",
+  "video_length": 145,
+  "overall_mood": "energetic",
+  "segments": [
+    {
+      "start_time": 0,
+      "end_time": 7,
+      "sentiment": "exciting",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 11,
+      "end_time": 14,
+      "sentiment": "busy",
+      "music_style": "ambient",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 14,
+      "end_time": 19,
+      "sentiment": "focused",
+      "music_style": "cinematic",
+      "intensity": "low",
+      "include": true
+    },
+    {
+      "start_time": 34,
+      "end_time": 38,
+      "sentiment": "engaged",
+      "music_style": "acoustic",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 40,
+      "end_time": 43,
+      "sentiment": "collaborative",
+      "music_style": "electronic",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 120,
+      "end_time": 125,
+      "sentiment": "innovative",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 126,
+      "end_time": 130,
+      "sentiment": "celebratory",
+      "music_style": "pop",
+      "intensity": "medium",
+      "include": true
+    }
+  ],
+  "music": {
+    "tracks": [
+      {
+        "start": 0,
+        "end": 60,
+        "style": "Pop",
+        "intensity": "medium",
+        "sentiment": "happy"
+      }
+    ]
+  }
+}

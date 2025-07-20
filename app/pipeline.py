@@ -100,8 +100,15 @@ def process_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
         
         # Parse the sentiment analysis JSON file
         import json
-        with open(sentiment_data.get('file_path'), 'r') as f:
+        json_file_path = job.sentiment_analysis.file_path
+        if not json_file_path:
+            raise RuntimeError("No sentiment analysis file path available")
+            
+        with open(json_file_path, 'r') as f:
             json_data = json.load(f)
+            
+        # Get video length from JSON
+        video_length = json_data.get('video_length', 60)  # Default to 60 seconds if not specified
             
         # Create video segments based on JSON segments
         current_output_time = 0  # Track the output timeline position in seconds
@@ -128,7 +135,11 @@ def process_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
                 volume=0.4,
                 fade_in=None,
                 fade_out=None,
-                metadata=None
+                metadata={
+                    'concat': True,
+                    'video_concat': True,  # Explicitly request video concatenation
+                    'segment_index': len(input_segments)  # Keep track of segment order
+                }
             )
             input_segments.append(video_segment)
             

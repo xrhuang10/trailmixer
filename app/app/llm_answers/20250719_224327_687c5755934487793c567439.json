@@ -1,0 +1,116 @@
+{
+  "video_id": "HackThe6ixVideo",
+  "video_title": "Hack the 6ix Hackathon Highlights",
+  "video_description": "A compilation of the Hack the 6ix hackathon event, featuring various activities, presentations, and team-building exercises.",
+  "video_length": 145,
+  "overall_mood": "energetic",
+  "segments": [
+    {
+      "start_time": 0,
+      "end_time": 7,
+      "sentiment": "exciting",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 31,
+      "end_time": 35,
+      "sentiment": "focused",
+      "music_style": "electronic",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 35,
+      "end_time": 38,
+      "sentiment": "engaged",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 40,
+      "end_time": 43,
+      "sentiment": "collaborative",
+      "music_style": "acoustic",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 58,
+      "end_time": 62,
+      "sentiment": "competitive",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 62,
+      "end_time": 69,
+      "sentiment": "teamwork",
+      "music_style": "acoustic",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 72,
+      "end_time": 74,
+      "sentiment": "fun",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 90,
+      "end_time": 95,
+      "sentiment": "enthusiastic",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 105,
+      "end_time": 109,
+      "sentiment": "celebratory",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 126,
+      "end_time": 129,
+      "sentiment": "joyful",
+      "music_style": "acoustic",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 132,
+      "end_time": 135,
+      "sentiment": "accomplished",
+      "music_style": "cinematic",
+      "intensity": "low",
+      "include": true
+    },
+    {
+      "start_time": 135,
+      "end_time": 138,
+      "sentiment": "grateful",
+      "music_style": "acoustic",
+      "intensity": "medium",
+      "include": true
+    }
+  ],
+  "music": {
+    "tracks": [
+      {
+        "start": 0,
+        "end": 60,
+        "style": "Pop",
+        "intensity": "medium",
+        "sentiment": "energetic"
+      }
+    ]
+  }
+}

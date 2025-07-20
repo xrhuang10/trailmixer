@@ -1,0 +1,140 @@
+{
+  "video_id": "HackThe6ixVideo",
+  "video_title": "Hack the 6ix Hackathon Highlights",
+  "video_description": "Highlights of the Hack the 6ix hackathon event showcasing various activities and presentations.",
+  "video_length": 145,
+  "overall_mood": "energetic",
+  "segments": [
+    {
+      "start_time": 0,
+      "end_time": 7,
+      "sentiment": "exciting",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 31,
+      "end_time": 35,
+      "sentiment": "focused",
+      "music_style": "electronic",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 35,
+      "end_time": 38,
+      "sentiment": "engaged",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 40,
+      "end_time": 43,
+      "sentiment": "collaborative",
+      "music_style": "acoustic",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 50,
+      "end_time": 53,
+      "sentiment": "productive",
+      "music_style": "cinematic",
+      "intensity": "low",
+      "include": true
+    },
+    {
+      "start_time": 53,
+      "end_time": 56,
+      "sentiment": "informative",
+      "music_style": "acoustic",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 60,
+      "end_time": 63,
+      "sentiment": "competitive",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 63,
+      "end_time": 67,
+      "sentiment": "cooperative",
+      "music_style": "acoustic",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 70,
+      "end_time": 73,
+      "sentiment": "competitive",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 80,
+      "end_time": 83,
+      "sentiment": "competitive",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 86,
+      "end_time": 89,
+      "sentiment": "focused",
+      "music_style": "electronic",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 90,
+      "end_time": 93,
+      "sentiment": "engaged",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 99,
+      "end_time": 102,
+      "sentiment": "focused",
+      "music_style": "electronic",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 108,
+      "end_time": 111,
+      "sentiment": "focused",
+      "music_style": "electronic",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 127,
+      "end_time": 132,
+      "sentiment": "celebratory",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    }
+  ],
+  "music": {
+    "tracks": [
+      {
+        "start": 0,
+        "end": 60,
+        "style": "Pop",
+        "intensity": "medium",
+        "sentiment": "energetic"
+      }
+    ]
+  }
+}
