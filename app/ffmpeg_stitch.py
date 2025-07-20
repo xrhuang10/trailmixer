@@ -87,6 +87,7 @@ def build_input_stream(segment: InputSegment, index: int):
 
 def stitch_ffmpeg_request(request: FfmpegRequest) -> str:
     """Stitch multiple video and audio segments together using FFmpeg."""
+    print(f"InputSegments: {request.input_segments}")
     audio_streams = []
     video_streams = []
 
@@ -116,11 +117,34 @@ def stitch_ffmpeg_request(request: FfmpegRequest) -> str:
     # Process audio streams
     final_audio = None
     if audio_streams:
-        if len(audio_streams) > 1:
-            # Mix multiple audio streams
-            final_audio = ffmpeg.filter(audio_streams, 'amix', inputs=len(audio_streams), duration='longest')
+        # Process each audio stream with its own filters first
+        processed_streams = []
+        for i, stream in enumerate(audio_streams):
+            segment = request.input_segments[i]
+            if segment.file_type == 'audio':  # Only process background music streams
+                # Apply volume
+                if segment.volume and segment.volume != 1.0:
+                    stream = ffmpeg.filter(stream, 'volume', segment.volume)
+                
+                # Apply fades if specified
+                if segment.fade_in:
+                    stream = ffmpeg.filter(stream, 'afade', t='in', st=0, d=segment.fade_in)
+                if segment.fade_out:
+                    fade_start = _time_to_seconds(segment.end_time) - _time_to_seconds(segment.start_time) - float(segment.fade_out)
+                    stream = ffmpeg.filter(stream, 'afade', t='out', st=fade_start, d=segment.fade_out)
+                
+                # Add silence padding if needed
+                start_seconds = _time_to_seconds(segment.start_time)
+                if start_seconds > 0:
+                    stream = ffmpeg.filter(stream, 'adelay', f'{int(start_seconds * 1000)}|{int(start_seconds * 1000)}')
+            
+            processed_streams.append(stream)
+
+        if len(processed_streams) > 1:
+            # Mix all audio streams together
+            final_audio = ffmpeg.filter(processed_streams, 'amix', inputs=len(processed_streams), duration='longest')
         else:
-            final_audio = audio_streams[0]
+            final_audio = processed_streams[0]
 
         # Apply global audio settings
         if request.global_volume and request.global_volume != 1.0:

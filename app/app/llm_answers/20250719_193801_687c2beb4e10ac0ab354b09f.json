@@ -1,0 +1,92 @@
+{
+  "video_id": "HackThe6ixHackathonVideo",
+  "video_title": "Hack the 6ix Hackathon Highlights",
+  "video_description": "Highlights of the Hack the 6ix hackathon event showcasing various activities and presentations.",
+  "video_length": 145,
+  "overall_mood": "energetic",
+  "segments": [
+    {
+      "start_time": 0,
+      "end_time": 7,
+      "sentiment": "exciting",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 11,
+      "end_time": 14,
+      "sentiment": "positive",
+      "music_style": "pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 28,
+      "end_time": 31,
+      "sentiment": "focused",
+      "music_style": "cinematic",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 34,
+      "end_time": 37,
+      "sentiment": "engaged",
+      "music_style": "electronic",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 40,
+      "end_time": 43,
+      "sentiment": "collaborative",
+      "music_style": "acoustic",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 58,
+      "end_time": 63,
+      "sentiment": "competitive",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 90,
+      "end_time": 95,
+      "sentiment": "enthusiastic",
+      "music_style": "pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 105,
+      "end_time": 109,
+      "sentiment": "joyful",
+      "music_style": "upbeat",
+      "intensity": "high",
+      "include": true
+    },
+    {
+      "start_time": 126,
+      "end_time": 129,
+      "sentiment": "celebratory",
+      "music_style": "pop",
+      "intensity": "medium",
+      "include": true
+    }
+  ],
+  "music": {
+    "tracks": [
+      {
+        "start": 0,
+        "end": 60,
+        "style": "Pop",
+        "intensity": "medium",
+        "sentiment": "energetic"
+      }
+    ]
+  }
+}

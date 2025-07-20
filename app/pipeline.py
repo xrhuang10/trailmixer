@@ -108,7 +108,7 @@ def process_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
             end_time=video_formatted_duration,
             clip_start='00:00:00',
             clip_end=video_formatted_duration,  # Set explicit clip end
-            volume=1.0,
+            volume=0.4,
             fade_in=None,
             fade_out=None,
             metadata=None
@@ -132,7 +132,7 @@ def process_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
                 end_time=end_formatted,
                 clip_start='00:00:00',
                 clip_end=end_formatted,  # Set explicit clip end
-                volume=0.3,  # Background music volume
+                volume=0.6,  # Background music volume
                 fade_in='0.5',
                 fade_out='0.5',
                 metadata=None
@@ -155,7 +155,7 @@ def process_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
             fps=None,
             audio_channels=2,
             audio_sample_rate=44100,
-            global_volume=0.3,
+            global_volume=1.0,
             normalize_audio=False,
             crossfade_duration='1.0',
             gap_duration='00:00:00',
