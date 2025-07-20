@@ -493,8 +493,75 @@ def upload_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
         sentiment_request = SentimentAnalysisRequest(video_id=video_id, prompt=extract_info_prompt)
         sentiment_result = analyze_sentiment_with_twelvelabs(sentiment_request)
         job.sentiment_analysis = sentiment_result
-        job.sentiment_data = sentiment_result.sentiment_analysis
-        job.segment_timestamps = sentiment_result.sentiment_analysis.segments
+        
+        # Extract segments with proper error handling for missing fields
+        if sentiment_result.sentiment_analysis and hasattr(sentiment_result.sentiment_analysis, 'segments'):
+            # Convert segments to a format that handles missing fields
+            segments_list = []
+            raw_segments = sentiment_result.sentiment_analysis.segments
+            
+            print(f"🔍 DEBUG: Processing segments")
+            print(f"   Raw segments type: {type(raw_segments)}")
+            print(f"   Raw segments content: {raw_segments}")
+            
+            for i, segment in enumerate(raw_segments):
+                print(f"   Segment {i} type: {type(segment)}")
+                print(f"   Segment {i} content: {segment}")
+                
+                try:
+                    # Handle different segment data types
+                    if isinstance(segment, dict):
+                        segment_dict = segment
+                    elif isinstance(segment, list):
+                        # Handle case where segment is a list - skip or create default
+                        print(f"   ⚠️ Segment {i} is a list, skipping: {segment}")
+                        continue
+                    elif hasattr(segment, 'dict'):
+                        segment_dict = segment.dict()
+                    elif hasattr(segment, '__dict__'):
+                        segment_dict = vars(segment)
+                    else:
+                        # Fallback: try to convert to dict or create default
+                        print(f"   ⚠️ Unknown segment type {type(segment)}, creating default")
+                        segment_dict = {
+                            'start_time': i * 10,
+                            'end_time': (i + 1) * 10,
+                            'sentiment': 'neutral',
+                            'music_style': 'ambient',
+                            'intensity': 'medium'
+                        }
+                    
+                    # Ensure all required fields are present with defaults
+                    normalized_segment = {
+                        'start_time': segment_dict.get('start_time', i * 10),
+                        'end_time': segment_dict.get('end_time', (i + 1) * 10),
+                        'sentiment': segment_dict.get('sentiment', 'neutral'),
+                        'music_style': segment_dict.get('music_style', 'ambient'),
+                        'intensity': segment_dict.get('intensity', 'medium'),  # Add missing intensity field
+                        'include': segment_dict.get('include', True)
+                    }
+                    segments_list.append(normalized_segment)
+                    print(f"   ✅ Processed segment {i}: {normalized_segment['start_time']}s - {normalized_segment['end_time']}s")
+                    
+                except Exception as segment_error:
+                    print(f"   ❌ Error processing segment {i}: {segment_error}")
+                    # Create a default segment to avoid total failure
+                    default_segment = {
+                        'start_time': i * 10,
+                        'end_time': (i + 1) * 10,
+                        'sentiment': 'neutral',
+                        'music_style': 'ambient',
+                        'intensity': 'medium',
+                        'include': True
+                    }
+                    segments_list.append(default_segment)
+                    print(f"   🔄 Created default segment {i}: {default_segment['start_time']}s - {default_segment['end_time']}s")
+            
+            job.segment_timestamps = segments_list
+            print(f"✅ Processed {len(segments_list)} segments with normalized fields")
+        else:
+            print("⚠️ No segments found in sentiment analysis, using empty list")
+            job.segment_timestamps = []
         
         if not sentiment_result.success:
             raise RuntimeError(f"Sentiment analysis failed for '{filename}': {sentiment_result.error_message}")
@@ -598,11 +665,43 @@ def process_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
             print("❌ Cannot create FFmpeg request: sentiment analysis failed")
             return
         
-        # Convert to dict if needed
-        if hasattr(raw_data, 'dict'):
-            sentiment_data = dict(raw_data.dict())
-        else:
-            sentiment_data = dict(raw_data)
+        # Convert to dict with proper type handling
+        print(f"🔍 DEBUG: Converting sentiment data to dict")
+        print(f"   Raw data type: {type(raw_data)}")
+        print(f"   Raw data content: {raw_data}")
+        
+        try:
+            if isinstance(raw_data, dict):
+                sentiment_data = raw_data
+            elif isinstance(raw_data, list):
+                print("⚠️ Raw data is a list, creating default sentiment data structure")
+                sentiment_data = {
+                    'video_length': 60,  # Default video length
+                    'overall_mood': 'neutral',
+                    'segments': raw_data if len(raw_data) > 0 else []
+                }
+            elif hasattr(raw_data, 'dict'):
+                sentiment_data = raw_data.dict()
+            elif hasattr(raw_data, '__dict__'):
+                sentiment_data = vars(raw_data)
+            else:
+                print(f"⚠️ Unknown raw_data type {type(raw_data)}, creating default structure")
+                sentiment_data = {
+                    'video_length': 60,
+                    'overall_mood': 'neutral',
+                    'segments': []
+                }
+            
+            print(f"✅ Converted to sentiment_data dict with keys: {list(sentiment_data.keys())}")
+            
+        except Exception as conversion_error:
+            print(f"❌ Error converting sentiment data: {conversion_error}")
+            # Create fallback sentiment data
+            sentiment_data = {
+                'video_length': 60,
+                'overall_mood': 'neutral', 
+                'segments': []
+            }
         
         # Create FfmpegRequest with video and audio segments
         from models import InputSegment

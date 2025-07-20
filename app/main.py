@@ -126,32 +126,29 @@ def upload_video(video_files: List[UploadFile] = File(...)):
         if len(temp_files) > 1:
             print(f"🔗 Stitching {len(temp_files)} videos together...")
             
-            # Create temporary output file for stitched result
-            stitched_temp_file = tempfile.NamedTemporaryFile(
-                delete=False,
-                suffix='.mp4',
-                prefix=f"stitched_{job_id}_"
-            )
-            stitched_temp_file.close()  # Close file handle so FFmpeg can write to it
+            # Create permanent output file for stitched result in uploads directory
+            final_filename = f"stitched_{job_id}_{len(temp_files)}_videos.mp4"
+            stitched_output_path = os.path.join(upload_dir, final_filename)
             
             try:
-                final_video_path = stitch_videos_together(temp_files, stitched_temp_file.name)
-                final_filename = f"stitched_{len(temp_files)}_videos.mp4"
+                final_video_path = stitch_videos_together(temp_files, stitched_output_path)
                 print(f"✅ Videos stitched successfully: {final_filename}")
+                print(f"   📁 Permanent path: {final_video_path}")
                 
             except Exception as e:
                 print(f"❌ Video stitching failed: {str(e)}")
-                # Clean up stitched temp file on error
-                try:
-                    os.unlink(stitched_temp_file.name)
-                except:
-                    pass
                 raise HTTPException(status_code=500, detail=f"Failed to stitch videos: {str(e)}")
         else:
-            # Single video - use temp file as is
-            final_video_path = temp_files[0]
-            final_filename = uploaded_filenames[0]
-            print(f"📹 Single video uploaded: {final_filename}")
+            # Single video - copy to permanent location in uploads directory
+            original_temp_path = temp_files[0] 
+            final_filename = f"{job_id}_{uploaded_filenames[0]}"
+            final_video_path = os.path.join(upload_dir, final_filename)
+            
+            # Copy single video to permanent location
+            import shutil
+            shutil.copy2(original_temp_path, final_video_path)
+            print(f"📹 Single video copied to permanent location: {final_filename}")
+            print(f"   📁 Permanent path: {final_video_path}")
         
         # Verify final video exists
         if not os.path.exists(final_video_path):
@@ -180,7 +177,8 @@ def upload_video(video_files: List[UploadFile] = File(...)):
                 created_at=datetime.datetime.now().isoformat(),
                 twelve_labs_video_id=None,
                 sentiment_analysis=None,
-                processed_video=None
+                processed_video=None,
+                segment_timestamps=None
             )
             
             # Use upload pipeline as helper function (runs steps 1-3)
@@ -188,6 +186,20 @@ def upload_video(video_files: List[UploadFile] = File(...)):
             
             # Get results from the pipeline
             temp_job = temp_job_status[temp_job_id]
+            
+            # IMPORTANT: Store the job in global job_status so crop_video can find it
+            job_status[temp_job_id] = temp_job
+            
+            # Debug: Check what sentiment analysis data was stored
+            print(f"🔍 DEBUG: Job stored in global job_status")
+            print(f"   Job ID: {temp_job_id}")
+            print(f"   Status: {temp_job.status}")
+            print(f"   Has sentiment_analysis: {temp_job.sentiment_analysis is not None}")
+            if temp_job.sentiment_analysis:
+                print(f"   Sentiment analysis file_path: {temp_job.sentiment_analysis.file_path}")
+                print(f"   Has segment_timestamps: {hasattr(temp_job, 'segment_timestamps')}")
+                if hasattr(temp_job, 'segment_timestamps'):
+                    print(f"   Segment timestamps count: {len(temp_job.segment_timestamps) if temp_job.segment_timestamps else 0}")
             
             if temp_job.status == JobStatus.FAILED:
                 raise RuntimeError(temp_job.message)
@@ -336,24 +348,24 @@ def upload_video(video_files: List[UploadFile] = File(...)):
         raise HTTPException(status_code=500, detail=f"Upload processing failed: {str(e)}")
     
     finally:
-        # Clean up all temporary files including the stitched video
-        all_temp_files = temp_files.copy()
-        
-        # Add the final stitched video to cleanup if it exists and was created
-        if 'final_video_path' in locals() and len(temp_files) > 1:
-            # Only clean up stitched video if it was created (multiple videos)
-            all_temp_files.append(final_video_path)
-        
-        for temp_file_path in all_temp_files:
+        # Clean up only the original temporary input files (NOT the final video)
+        # The final video is now stored permanently in uploads directory
+        cleanup_count = 0
+        for temp_file_path in temp_files:
             try:
                 if os.path.exists(temp_file_path):
                     os.unlink(temp_file_path)
-                    if temp_file_path in temp_files:
-                        print(f"🧹 Cleaned up temp input file: {os.path.basename(temp_file_path)}")
-                    else:
-                        print(f"🧹 Cleaned up stitched temp file: {os.path.basename(temp_file_path)}")
+                    cleanup_count += 1
+                    print(f"🧹 Cleaned up temp input file: {os.path.basename(temp_file_path)}")
             except Exception as cleanup_error:
                 print(f"⚠️ Failed to clean up temp file {temp_file_path}: {cleanup_error}")
+        
+        if cleanup_count > 0:
+            print(f"🧹 Cleaned up {cleanup_count} temporary input files")
+            if 'final_video_path' in locals():
+                print(f"✅ Final video preserved at: {final_video_path}")
+        else:
+            print(f"🧹 No temporary files to clean up")
 
 # Request model for video processing with timestamps
 class VideoProcessingTimestampsRequest(BaseModel):
@@ -374,7 +386,21 @@ def crop_video(job_id: str):
         raise HTTPException(status_code=404, detail="Job not found. Must upload and analyze video first.")
     
     job = job_status[job_id]
-    if not job.sentiment_analysis or not job.sentiment_analysis.file_path:
+    
+    # Debug: Check what's actually in the job
+    print(f"🔍 DEBUG: Retrieved job from job_status")
+    print(f"   Job ID: {job_id}")
+    print(f"   Status: {job.status}")
+    print(f"   Has sentiment_analysis: {job.sentiment_analysis is not None}")
+    if job.sentiment_analysis:
+        print(f"   Sentiment analysis file_path: {getattr(job.sentiment_analysis, 'file_path', 'NO FILE_PATH ATTR')}")
+        print(f"   Sentiment analysis type: {type(job.sentiment_analysis)}")
+    print(f"   Has segment_timestamps attr: {hasattr(job, 'segment_timestamps')}")
+    if hasattr(job, 'segment_timestamps'):
+        print(f"   Segment timestamps: {job.segment_timestamps}")
+        print(f"   Segment timestamps type: {type(job.segment_timestamps)}")
+    
+    if not job.sentiment_analysis:
         raise HTTPException(status_code=400, detail="No sentiment analysis found. Must complete video analysis first.")
     
     # Get upload results to find the stitched video
@@ -386,8 +412,28 @@ def crop_video(job_id: str):
     stitched_video_path = video_info.get("file_path")
     source_filename = video_info.get("filename", f"video_{job_id}.mp4")
     
-    if not stitched_video_path or not os.path.exists(stitched_video_path):
-        raise HTTPException(status_code=404, detail="Stitched video file not found")
+    # Debug: Show what paths we're working with
+    print(f"🔍 DEBUG: Video path resolution")
+    print(f"   Expected path from upload_results: {stitched_video_path}")
+    print(f"   Path exists: {os.path.exists(stitched_video_path) if stitched_video_path else 'PATH IS NONE'}")
+    print(f"   Source filename: {source_filename}")
+    
+    # Also check if the job has the file_path stored
+    if hasattr(job, 'file_path') and job.file_path:
+        print(f"   Job file_path: {job.file_path}")
+        print(f"   Job path exists: {os.path.exists(job.file_path)}")
+        
+        # Use job file_path if upload_results path is missing or doesn't exist
+        if not stitched_video_path or not os.path.exists(stitched_video_path):
+            if os.path.exists(job.file_path):
+                print(f"   🔄 Using job.file_path instead of upload_results path")
+                stitched_video_path = job.file_path
+    
+    if not stitched_video_path:
+        raise HTTPException(status_code=404, detail="Stitched video file not found - no path available")
+    
+    if not os.path.exists(stitched_video_path):
+        raise HTTPException(status_code=404, detail=f"Stitched video file not found at path: {stitched_video_path}")
     
     try:
         print(f"✂️ Cropping video for job: {job_id}")

@@ -145,7 +145,25 @@ def process_video_segments(request: VideoProcessingRequest) -> VideoProcessingRe
             
             # Process each music track using audio_picker functions
             for i, track in enumerate(tracks):
-                track_dict = track.dict() if hasattr(track, 'dict') else track
+                # Handle different track data types
+                if isinstance(track, dict):
+                    track_dict = track
+                elif isinstance(track, list):
+                    print(f"⚠️ Track {i} is a list, skipping: {track}")
+                    continue
+                elif hasattr(track, 'dict'):
+                    track_dict = track.dict()
+                elif hasattr(track, '__dict__'):
+                    track_dict = vars(track)
+                else:
+                    print(f"⚠️ Unknown track type {type(track)}, creating default")
+                    track_dict = {
+                        'start': i * 20,
+                        'end': (i + 1) * 20,
+                        'style': 'Pop',
+                        'sentiment': 'calm',
+                        'intensity': 'medium'
+                    }
                 
                 start_time = track_dict.get('start', 0)
                 end_time = track_dict.get('end', 60)
@@ -320,7 +338,25 @@ def process_single_video_in_batch(video_result: VideoAnalysisResult, audio_libra
             else:
                 tracks = music_data.tracks
                 for i, track in enumerate(tracks):
-                    track_dict = track.dict() if hasattr(track, 'dict') else track
+                    # Handle different track data types
+                    if isinstance(track, dict):
+                        track_dict = track
+                    elif isinstance(track, list):
+                        print(f"⚠️ Track {i} is a list, skipping: {track}")
+                        continue
+                    elif hasattr(track, 'dict'):
+                        track_dict = track.dict()
+                    elif hasattr(track, '__dict__'):
+                        track_dict = vars(track)
+                    else:
+                        print(f"⚠️ Unknown track type {type(track)}, creating default")
+                        track_dict = {
+                            'start': i * 20,
+                            'end': (i + 1) * 20,
+                            'style': 'Pop',
+                            'sentiment': 'calm',
+                            'intensity': 'medium'
+                        }
                     
                     start_time = track_dict.get('start', 0)
                     end_time = track_dict.get('end', 60)

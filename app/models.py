@@ -15,14 +15,6 @@ class VideoSegment(BaseModel):
     end_time: float = Field(..., description="End time of the segment in seconds")
     sentiment: str = Field(..., description="The sentiment/mood of this segment")
     music_style: str = Field(..., description="Recommended music style/genre for this segment")
-    intensity: str = Field(..., description="Intensity level of the segment (low, medium, high)")
-    
-    @validator('intensity')
-    def validate_intensity(cls, v):
-        allowed_values = ['low', 'medium', 'high']
-        if v.lower() not in allowed_values:
-            raise ValueError(f'Intensity must be one of: {allowed_values}')
-        return v.lower()
     
     @validator('end_time')
     def validate_times(cls, v, values):
@@ -78,6 +70,7 @@ class JobInfo(BaseModel):
     twelve_labs_video_id: Optional[str] = Field(None, description="Twelve Labs video ID")
     sentiment_analysis: Optional[SentimentAnalysisResponse] = Field(None, description="Sentiment analysis result")
     processed_video: Optional[Dict[str, Any]] = Field(None, description="Processed video information")
+    segment_timestamps: Optional[List[Dict[str, Any]]] = Field(None, description="Video segment timestamps from sentiment analysis")
 
 # === Video Processing Models ===
 class VideoProcessingRequest(BaseModel):
