@@ -59,6 +59,7 @@ class VideoUploadSimpleResponse(BaseModel):
     """Simplified response for video upload with just job_id and music file paths"""
     job_id: str = Field(..., description="Unique job identifier")
     music_file_paths: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="Music file paths with timing information")
+    audio_timestamps: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="Audio timestamps ready for download endpoint")
     debug_info: Dict[str, Any] = Field(default_factory=dict, description="Miscellaneous debugging information")
 
 # ==================== API ENDPOINTS ====================
@@ -308,13 +309,24 @@ def upload_video(video_files: List[UploadFile] = File(...)):
             "message": message
         }
         
-        print(f"🎵 Returning simplified upload response")
-        
         # Extract music file paths from the first video result
         music_file_paths = {}
+        audio_timestamps = {}
         if video_results and len(video_results) > 0:
             video_result = video_results[0]
             music_file_paths = video_result.get("music_file_paths", {})
+            
+            # Convert music_file_paths to audio_timestamps format for download endpoint
+            for audio_file, timing_info in music_file_paths.items():
+                # Extract only start and end times for the download endpoint format
+                audio_timestamps[audio_file] = {
+                    "start": timing_info.get("start", 0),
+                    "end": timing_info.get("end", 10)
+                }
+            
+            print(f"🎵 Generated audio_timestamps for download: {len(audio_timestamps)} tracks")
+            for i, (audio_file, timing) in enumerate(audio_timestamps.items()):
+                print(f"   Track {i+1}: {os.path.basename(audio_file)} ({timing['start']}s - {timing['end']}s)")
         
         # Create debug info with miscellaneous details
         debug_info = {
@@ -330,13 +342,21 @@ def upload_video(video_files: List[UploadFile] = File(...)):
             "video_length": video_results[0].get("video_length", 0) if video_results else 0,
             "overall_mood": video_results[0].get("overall_mood", "") if video_results else "",
             "original_filenames": uploaded_filenames,
+            "audio_timestamps_count": len(audio_timestamps),
             "processing_errors": video_results[0].get("audio_error") if video_results and not video_results[0].get("success", True) else None
         }
+        
+        print(f"🎵 Returning simplified upload response")
+        print(f"   📋 Job ID: {job_id}")
+        print(f"   🎼 Music file paths: {len(music_file_paths)}")
+        print(f"   🎯 Audio timestamps (ready for download): {len(audio_timestamps)}")
+        print(f"   💾 Debug info fields: {len(debug_info)}")
         
         # Return simplified response
         return VideoUploadSimpleResponse(
             job_id=job_id,
             music_file_paths=music_file_paths,
+            audio_timestamps=audio_timestamps,
             debug_info=debug_info
         )
         
@@ -375,6 +395,47 @@ class VideoProcessingTimestampsRequest(BaseModel):
     output_filename: Optional[str] = Field(None, description="Custom output filename")
     crop_settings: Optional[Dict[str, Any]] = Field(None, description="Video cropping settings")
     audio_settings: Optional[Dict[str, Any]] = Field(None, description="Audio processing settings")
+
+# Request model for download processed video
+class DownloadProcessedVideoRequest(BaseModel):
+    """Request for downloading processed video with audio timestamps"""
+    job_id: str = Field(..., description="Unique job identifier for the video to download")
+    audio_timestamps: Dict[str, Dict[str, Any]] = Field(
+        ..., 
+        description="Dictionary where keys are audio file paths and values contain timing info",
+        example={
+            "../music/pop/exciting.mp3": {"start": 0, "end": 10},
+            "../music/classical/dramatic.mp3": {"start": 10, "end": 20},
+            "../music/pop/calm.mp3": {"start": 20, "end": 30}
+        }
+    )
+    video_volume: Optional[float] = Field(0.8, ge=0.0, le=2.0, description="Volume level for original video audio (0.0 to 2.0)")
+    music_volume: Optional[float] = Field(0.3, ge=0.0, le=2.0, description="Volume level for background music (0.0 to 2.0)")
+    output_filename: Optional[str] = Field(None, description="Custom output filename (without extension)")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "job_id": "abc123-def456-ghi789",
+                "audio_timestamps": {
+                    "../music/pop/exciting.mp3": {
+                        "start": 0,
+                        "end": 10
+                    },
+                    "../music/classical/dramatic.mp3": {
+                        "start": 10,
+                        "end": 20
+                    },
+                    "../music/pop/calm.mp3": {
+                        "start": 20,
+                        "end": 30
+                    }
+                },
+                "video_volume": 0.8,
+                "music_volume": 0.3,
+                "output_filename": "my_processed_trailer"
+            }
+        }
 
 @app.post('/api/video/crop')
 def crop_video(job_id: str):
@@ -510,15 +571,14 @@ def crop_video(job_id: str):
         print(f"❌ {error_msg}")
         raise HTTPException(status_code=500, detail=error_msg)
 
-@app.post('/api/video/download/{job_id}')
-def download_processed_video(
-    job_id: str, 
-    audio_timestamps: Dict[str, Dict[str, Any]]
-):
+@app.post('/api/video/download')
+def download_processed_video(request: DownloadProcessedVideoRequest):
     """
     Download the final processed video file with music added to pre-cropped video
     Requires video to be cropped first via /api/video/crop
     """
+    job_id = request.job_id
+    
     # Check if video has been cropped first
     if job_id not in job_status:
         raise HTTPException(status_code=404, detail="Job not found. Must crop video first.")
@@ -535,19 +595,30 @@ def download_processed_video(
     try:
         print(f"🎵 Adding music to cropped video for job: {job_id}")
         print(f"   📁 Cropped video: {job.processed_video.get('cropped_filename')}")
-        print(f"   🎵 Audio timestamps: {len(audio_timestamps)}")
+        print(f"   🎵 Audio timestamps: {len(request.audio_timestamps)}")
+        print(f"   🔊 Video volume: {request.video_volume}")
+        print(f"   🎼 Music volume: {request.music_volume}")
+        if request.output_filename:
+            print(f"   📝 Custom filename: {request.output_filename}")
         
         # Create output path for final video
         os.makedirs("../processed_videos", exist_ok=True)
-        final_video_path = f"../processed_videos/{job_id}_final.mp4"
+        
+        # Use custom filename if provided
+        if request.output_filename:
+            final_filename = f"{request.output_filename}.mp4"
+        else:
+            final_filename = f"{job_id}_final.mp4"
+        
+        final_video_path = f"../processed_videos/{final_filename}"
         
         # Add music to the pre-cropped video
         final_path = add_music_to_video(
             video_filepath=cropped_video_path,
-            music_tracks=audio_timestamps,
+            music_tracks=request.audio_timestamps,
             output_path=final_video_path,
-            video_volume=0.8,  # Slightly lower video audio
-            music_volume=0.3   # Background music level
+            video_volume=request.video_volume,
+            music_volume=request.music_volume
         )
         
         # Update job status with final video info
@@ -556,7 +627,10 @@ def download_processed_video(
         job.processed_video.update({
             "final_video_path": final_path,
             "final_filename": os.path.basename(final_path),
-            "music_tracks_count": len(audio_timestamps),
+            "music_tracks_count": len(request.audio_timestamps),
+            "video_volume": request.video_volume,
+            "music_volume": request.music_volume,
+            "custom_filename": request.output_filename,
             "processing_complete": True
         })
         
@@ -569,10 +643,13 @@ def download_processed_video(
         print(f"   📁 Final video: {os.path.basename(final_path)}")
         print(f"   📊 Size: {file_size / (1024*1024):.1f} MB")
         
+        # Use custom filename for download if provided
+        download_filename = f"{request.output_filename}.mp4" if request.output_filename else f"processed_trailer_{job_id}.mp4"
+        
         return FileResponse(
             path=final_path,
             media_type='video/mp4',
-            filename=f"processed_trailer_{job_id}.mp4"
+            filename=download_filename
         )
         
     except Exception as e:
