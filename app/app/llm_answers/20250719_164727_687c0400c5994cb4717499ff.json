@@ -1,0 +1,36 @@
+{
+  "video_id": "1234567890",
+  "video_title": "Kawaii Cat Ears Video",
+  "video_description": "A young man wearing cat ears points at the camera and walks away.",
+  "video_length": 4.0,
+  "overall_mood": "happy",
+  "segments": [
+    {
+      "start_time": 0.0,
+      "end_time": 1.0,
+      "sentiment": "positive",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    },
+    {
+      "start_time": 1.0,
+      "end_time": 4.0,
+      "sentiment": "neutral",
+      "music_style": "Pop",
+      "intensity": "low",
+      "include": false
+    }
+  ],
+  "music": {
+    "tracks": [
+      {
+        "start": 0,
+        "end": 60,
+        "style": "Pop",
+        "intensity": "medium",
+        "sentiment": "happy"
+      }
+    ]
+  }
+}
