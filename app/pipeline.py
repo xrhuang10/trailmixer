@@ -19,6 +19,156 @@ from twelvelabs_client import upload_video_to_twelvelabs
 from audio_picker import get_music_file_paths
 from ffmpeg_stitch import stitch_ffmpeg_request
 
+def crop_and_stitch_video_segments(video_filepath: str, segments: List[Dict], output_path: str) -> str:
+    """
+    Crop video segments and stitch them together into a final video.
+    
+    Args:
+        video_filepath: Path to the input video file
+        segments: List of dictionaries with 'start' and 'end' keys (in seconds)
+                 Example: [{'start': 0, 'end': 10}, {'start': 20, 'end': 30}]
+        output_path: Path where the final stitched video should be saved
+        
+    Returns:
+        str: Path to the output video file
+        
+    Raises:
+        ValueError: If input validation fails
+        RuntimeError: If FFmpeg processing or stitching fails
+    """
+    if not video_filepath or not os.path.exists(video_filepath):
+        raise ValueError(f"Input video file not found: {video_filepath}")
+    
+    if not segments:
+        raise ValueError("No segments provided for cropping")
+    
+    if not output_path:
+        raise ValueError("Output path is required")
+    
+    print(f"🎬 Cropping and stitching video segments")
+    print(f"   📁 Input: {os.path.basename(video_filepath)}")
+    print(f"   📊 Segments: {len(segments)}")
+    print(f"   📁 Output: {os.path.basename(output_path)}")
+    
+    # Validate segments
+    for i, segment in enumerate(segments):
+        if 'start' not in segment or 'end' not in segment:
+            raise ValueError(f"Segment {i+1} missing 'start' or 'end' key")
+        
+        start = float(segment['start'])
+        end = float(segment['end'])
+        
+        if start < 0:
+            raise ValueError(f"Segment {i+1} start time cannot be negative: {start}")
+        
+        if end <= start:
+            raise ValueError(f"Segment {i+1} end time ({end}) must be greater than start time ({start})")
+        
+        print(f"   📹 Segment {i+1}: {start}s - {end}s (duration: {end-start:.1f}s)")
+    
+    temp_files = []
+    abs_video_path = os.path.abspath(video_filepath)
+    abs_output_path = os.path.abspath(output_path)
+    
+    try:
+        # Create temporary directory for cropped segments
+        temp_dir = tempfile.mkdtemp(prefix="video_segments_")
+        print(f"📁 Created temporary directory: {temp_dir}")
+        
+        # Crop each segment using FFmpeg
+        for i, segment in enumerate(segments):
+            start = float(segment['start'])
+            end = float(segment['end'])
+            duration = end - start
+            
+            # Create temporary file for this segment
+            segment_filename = f"segment_{i+1:03d}.mp4"
+            temp_segment_path = os.path.join(temp_dir, segment_filename)
+            
+            print(f"✂️ Cropping segment {i+1}/{len(segments)}: {start}s - {end}s")
+            
+            # Build FFmpeg command for cropping
+            ffmpeg_cmd = [
+                "ffmpeg",
+                "-i", abs_video_path,           # Input video
+                "-ss", str(start),              # Start time
+                "-t", str(duration),            # Duration
+                "-c", "copy",                   # Copy streams without re-encoding (fastest)
+                "-avoid_negative_ts", "make_zero",  # Handle timestamp issues
+                "-y",                           # Overwrite output file
+                temp_segment_path
+            ]
+            
+            print(f"   Command: ffmpeg -i {os.path.basename(abs_video_path)} -ss {start} -t {duration} -c copy -y {segment_filename}")
+            
+            # Execute FFmpeg command
+            try:
+                result = subprocess.run(
+                    ffmpeg_cmd,
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                
+                # Verify segment was created
+                if not os.path.exists(temp_segment_path):
+                    raise RuntimeError(f"FFmpeg completed but segment file was not created: {temp_segment_path}")
+                
+                segment_size = os.path.getsize(temp_segment_path)
+                print(f"   ✅ Segment {i+1} created: {segment_size / (1024*1024):.1f} MB")
+                temp_files.append(temp_segment_path)
+                
+            except subprocess.CalledProcessError as e:
+                error_msg = f"FFmpeg failed for segment {i+1} with exit code {e.returncode}"
+                if e.stderr:
+                    error_msg += f"\nSTDERR: {e.stderr}"
+                if e.stdout:
+                    error_msg += f"\nSTDOUT: {e.stdout}"
+                
+                print(f"❌ Segment {i+1} cropping failed: {error_msg}")
+                raise RuntimeError(f"Segment cropping failed: {error_msg}")
+        
+        print(f"✅ All {len(segments)} segments cropped successfully")
+        
+        # Stitch the cropped segments together
+        print(f"🔗 Stitching {len(temp_files)} segments together...")
+        final_output_path = stitch_videos_together(temp_files, abs_output_path)
+        
+        # Verify final output
+        if not os.path.exists(final_output_path):
+            raise RuntimeError("Final stitched video was not created")
+        
+        final_size = os.path.getsize(final_output_path)
+        print(f"✅ Video cropping and stitching completed successfully!")
+        print(f"   📁 Output: {os.path.basename(final_output_path)}")
+        print(f"   📊 Size: {final_size / (1024*1024):.1f} MB")
+        print(f"   🎬 Total segments: {len(segments)}")
+        
+        return final_output_path
+        
+    except Exception as e:
+        print(f"❌ Video cropping and stitching failed: {str(e)}")
+        raise RuntimeError(f"Video processing failed: {str(e)}")
+        
+    finally:
+        # Clean up temporary files
+        cleanup_count = 0
+        for temp_file in temp_files:
+            try:
+                if os.path.exists(temp_file):
+                    os.unlink(temp_file)
+                    cleanup_count += 1
+            except Exception as cleanup_error:
+                print(f"⚠️ Failed to clean up temp file {temp_file}: {cleanup_error}")
+        
+        # Clean up temporary directory
+        try:
+            if 'temp_dir' in locals() and os.path.exists(temp_dir):
+                os.rmdir(temp_dir)
+                print(f"🧹 Cleaned up {cleanup_count} temp files and directory")
+        except Exception as cleanup_error:
+            print(f"⚠️ Failed to clean up temp directory: {cleanup_error}")
+
 def stitch_videos_together(video_file_paths: List[str], output_path: str) -> str:
     """
     Stitch a list of videos together into a single video using FFmpeg
@@ -474,3 +624,29 @@ def process_multi_video_pipeline(job_id: str, multi_video_job_status: Dict[str, 
         job.message = f"Multi-video processing failed: {str(e)}"
         print(f"❌ Multi-video pipeline failed (Job: {job_id}): {str(e)}") 
 
+if __name__ == "__main__":
+    example_timestamps = [
+        {
+            "start": 5,
+            "end": 10,
+        },
+        {
+            "start": 15,
+            "end": 20,
+        },
+        {
+            "start": 25,
+            "end": 30,
+        },
+        {
+            "start": 55,
+            "end": 60,
+        }
+    ]
+    filename = '../videos/tom_and_jerry_trailer_no_music.mp4'
+    output_path = '../processed_videos/tom_and_jerry.mp4'
+    
+    crop_and_stitch_video_segments(filename, example_timestamps, output_path)
+    
+    print(f"✅ Video processing completed successfully for '{filename}'!")
+    print(f"   📁 Output: {os.path.basename(output_path)}")
