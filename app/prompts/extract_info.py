@@ -138,18 +138,41 @@ twelvelabs_output_schema = {
                 "music_style": {
                     "type": "string",
                     "description": "One of: 'Classical', 'Hip Hop', 'Pop', 'Electronic', 'Meme'"
-                },
-                "intensity": {
-                    "type": "string",
-                    "description": "Intensity level of the segment (low, medium, high)"
                 }
             },
             "required": ["start_time", "end_time", "sentiment", "music_style", "intensity"]
         }
+    },
+    "music": {
+        "type": "array",
+        "description": "Array of music tracks", 
+        "items": {
+            "type": "object",
+            "properties": {
+                "start": {
+                    "type": "number",
+                    "description": "Start time of the track in seconds"
+                },
+                "end": {
+                    "type": "number",
+                    "description": "End time of the track in seconds"
+                },
+                "style": {
+                    "type": "string",
+                    "description": "One of: 'Classical', 'Hip Hop', 'Pop', 'Electronic', 'Meme'"
+                },
+                "sentiment": {
+                    "type": "string",
+                    "description": "One of: 'happy', 'sad', 'energetic', 'calm', 'dramatic', 'romantic', 'suspenseful'"
+                }
+            },
+            "required": ["start", "end", "style", "sentiment"]
+        }
     }
 }
+ 
 
-desired_length = 60  # in seconds
+desired_length = 30  # in seconds
 music_style = "Pop"  # One of: Classical, Hip Hop, Pop, Electronic, Meme
 num_tracks = 3
 sentiment_list = ["happy", "sad", "energetic", "calm", "dramatic", "romantic", "suspenseful"]
@@ -173,98 +196,58 @@ sentiment_list = ["happy", "sad", "energetic", "calm", "dramatic", "romantic", "
 
 extract_info_prompt = f"""
 You are a professional video analyst that extracts information from videos for automated music mixing and editing.
+The hard cut off length is {desired_length} seconds.
+You are not providing specific audio analysis, rather I am asking you to provide a general music suggestion (only the style and sentiment).
 
-You will be given a video and a desired trailer length of {desired_length} seconds and must:
-1. Analyze and break it into logical segments based on mood, content, or scene/highlight changes.
-2. Select the most important segments to KEEP, such that the total cropped duration approximately equal to the desired trailer length of {desired_length} seconds. Note that the individual segment and tracks may vary in duration, as long as their sums add up.
-3. Propose {num_tracks} suitable music track(s) based on the mood and pacing of the selected segments.
+Given a video and the desired Trailers  length, you must
+1. Analyze and break video into logical segments based on mood, content, or scene/highlight changes.
+2. Select the most important segments to KEEP, such that the total cropped duration must be equal to the trailer length of {desired_length} seconds. Note that the individual segment and tracks may vary in duration, but MUST be {desired_length} seconds
+3. When segments total time is greater than the desired trailer length, reject the least important segments until the total duration is drops below {desired_length} seconds.
+4. Propose {num_tracks} suitable music track(s) based on the mood and pacing of the selected segments.
 
 Each segment must include:
 - "start_time": (number, in seconds)
 - "end_time": (number, in seconds)
 - "sentiment": the mood of the segment
 - "music_style": strictly "{music_style}"
-- "intensity": one of ["low", "medium", "high"]
-- "include": true or false (true if segment is included in the cropped final video)
+- "include": true or false (true if segment is included in the cropped final trailer)
 
-The end_time - start_time of each segment is the segment's duration. All segment durations added together must be equal to the desired trailer length of {desired_length} seconds. Note that the individual segment and individual track durations may vary in duration, as long as their sums add up.
+The end_time - start_time of each segment is the segment's duration. All segment durations added together must be less than the desired trailer length of {desired_length} seconds. Note that the individual segment and individual track durations may vary in duration, as long as their sums add up.
 
 ---
 
-**Music Track Guidelines:**
-
-Use the following structure for the `"music"` object:
-
-{f'''Single track format (if num_tracks = 1):
-"music": {{
-    "tracks": [
-        {{
-            "start": 0,
-            "end": total_duration_of_included_segments (must be the lesser of {desired_length} and video length),
-            "style": "{music_style}",
-            "intensity": "<analyzed intensity>",
-            "sentiment": "<one word from: "happy", "sad", "energetic", "calm", "dramatic", "romantic", "suspenseful">"
-        }}
-    ]
-}}''' if num_tracks == 1 else f'''Multiple tracks format (if num_tracks > 1):
-"music": {{
-    "tracks": [
-        {{
-            "start": 0,
-            "end": length_a,
-            "style": "{music_style}",
-            "intensity": "<analyzed intensity>",
-            "sentiment": "<one word from: "happy", "sad", "energetic", "calm", "dramatic", "romantic", "suspenseful"
-        }},
-        {{
-            "start": length_a,
-            "end": length_b,
-            "style": "{music_style}",
-            "intensity": "<analyzed intensity>",
-            "sentiment": "<one word from: "happy", "sad", "energetic", "calm", "dramatic", "romantic", "suspenseful>"
-        }},
-        ...
-        {{
-            "start": length_n,
-            "end": total_duration_of_included_segments (must be the lesser of {desired_length} and video length),
-            "style": "{music_style}",
-            "intensity": "<analyzed intensity>",
-            "sentiment": "<one word from: "happy", "sad", "energetic", "calm", "dramatic", "romantic", "suspenseful>""
-        }}
-    ]
-}}'''}
 
 **Constraints for Music Tracks:**
 - The number of tracks must be exactly {num_tracks}.
-- The total duration of all tracks combined must be around the user's desired length of {desired_length} seconds.
+- The total duration of the audio tracks combined MUST equal the total duration of `"include": true` segments.
 - Track time ranges must not overlap.
 - All timestamps must be numeric values in seconds.
+- This duration of all tracks combined must NOT exceed the MAX trailer length of {desired_length} seconds.
 - Each track must use a **unique combination** of `style` and `sentiment`.
 - Track sentiment must be a single word strictly from: "happy", "sad", "energetic", "calm", "dramatic", "romantic", "suspenseful".
 
 ---
 
 **General Rules:**
+- Avoid including segments smaller than 2 seconds. Remove them if they are less than 2 seconds to make more time for the other smaller segments.
 - Segments must not overlap or leave gaps between included portions.
-- Use the most emotionally or narratively meaningful scenes, BUT ABOVE ALL, make sure the total sum of durations of all the segments equals the user's desired length of {desired_length} seconds.
-- Prioritize time over meaningfulness. This means you can drop some segments or add some segments, even if they are not meaningful, as long as doing so will get to the desired length of {desired_length} seconds.
+- Use the most emotionally or narratively meaningful scenes, BUT ABOVE ALL, make sure the total sum of durations of all the segments equals the user's desired trailer length of {desired_length} seconds.
+- Prioritize time over meaningfulness. This means you can drop some segments or add some segments, even if they are not meaningful, as long as doing so will get to the desired trailer length of {desired_length} seconds.
 - All timestamps must be in numeric seconds (e.g., 14.5 — not "00:14").
-- Only use the full video if its total length is less than the user's desired length of {desired_length} seconds.
+- Only use the full video if its total length is less than the user's desired trailer length.
 
 **Also return:**
-- Full original video length
-- Effective cropped video length
+- Original video length (DO NOT CONFUSE WITH DESIRED TRAILER LENGTH). Original video length is always greater than the trailer length.
 - Overall mood/sentiment of the full video
 
 
 **IMPORTANT:**
-- The sum of all the segment durations == the sum of all the track durations == the user's desired length of {desired_length} seconds. Note that the individual segment and individual track durations may vary in duration, as long as their sums add up. 
+- AIM to have {desired_length / 10} segments.
+- AIM to have each segment duration be around 10 seconds.
+- Reminder: the desired trailer length is {desired_length} seconds which the trailer length cannot exceed.
 - Music must reflect the dominant mood and pacing of selected segments.
 - Each music track must have a **distinct combination** of style and sentiment.
-- Your #1 priority is to create a list of segments whose total sum of durations (end_time - start_time) equals the user's desired length of {desired_length} seconds, even if that means incorporating less meaningful segments. The sum of all the music track durations will also be around the user's desired length of {desired_length} seconds. 
-- Note that the individual segment and individual track durations may vary in duration, as long as their sums add up.
-- You must return ONLY the final JSON using this exact format with no additional text:
-
+- EXTREMELY IMPORTANT: Return ONLY the final JSON using this exact format WITH NO ADDITIONAL TEXT:
 {json.dumps(twelvelabs_output_schema, indent=4)}
 
 Now take a deep breath and start analyzing the video.
