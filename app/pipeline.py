@@ -19,6 +19,177 @@ from twelvelabs_client import upload_video_to_twelvelabs
 from audio_picker import get_music_file_paths
 from ffmpeg_stitch import stitch_ffmpeg_request
 
+def add_music_to_video(video_filepath: str, music_tracks: Dict[str, Dict], output_path: str, video_volume: float = 1.0, music_volume: float = 0.3) -> str:
+    """
+    Add background music tracks to a video at specified timestamps.
+    
+    Args:
+        video_filepath: Path to the input video file
+        music_tracks: Dictionary where keys are audio file paths and values are dicts with 'start' and 'end' timestamps
+                     Example: {
+                         "/path/to/music1.mp3": {"start": 0, "end": 30},
+                         "/path/to/music2.mp3": {"start": 25, "end": 60}
+                     }
+        output_path: Path where the output video with music should be saved
+        video_volume: Volume level for original video audio (0.0 to 1.0)
+        music_volume: Volume level for background music (0.0 to 1.0)
+        
+    Returns:
+        str: Path to the output video file
+        
+    Raises:
+        ValueError: If input validation fails
+        RuntimeError: If FFmpeg processing fails
+    """
+    if not video_filepath or not os.path.exists(video_filepath):
+        raise ValueError(f"Input video file not found: {video_filepath}")
+    
+    if not music_tracks:
+        raise ValueError("No music tracks provided")
+    
+    if not output_path:
+        raise ValueError("Output path is required")
+    
+    print(f"🎵 Adding background music to video")
+    print(f"   📁 Input video: {os.path.basename(video_filepath)}")
+    print(f"   🎼 Music tracks: {len(music_tracks)}")
+    print(f"   📁 Output: {os.path.basename(output_path)}")
+    
+    # Validate music tracks and timestamps
+    validated_tracks = []
+    for i, (audio_path, timing) in enumerate(music_tracks.items()):
+        if not os.path.exists(audio_path):
+            raise ValueError(f"Audio file not found: {audio_path}")
+        
+        if 'start' not in timing or 'end' not in timing:
+            raise ValueError(f"Track {i+1} missing 'start' or 'end' timestamp")
+        
+        start = float(timing['start'])
+        end = float(timing['end'])
+        
+        if start < 0:
+            raise ValueError(f"Track {i+1} start time cannot be negative: {start}")
+        
+        if end <= start:
+            raise ValueError(f"Track {i+1} end time ({end}) must be greater than start time ({start})")
+        
+        validated_tracks.append({
+            'path': audio_path,
+            'start': start,
+            'end': end,
+            'duration': end - start
+        })
+        
+        print(f"   🎼 Track {i+1}: {os.path.basename(audio_path)} ({start}s - {end}s, duration: {end-start:.1f}s)")
+    
+    abs_video_path = os.path.abspath(video_filepath)
+    abs_output_path = os.path.abspath(output_path)
+    
+    try:
+        # Build FFmpeg command with filter_complex for audio mixing
+        print(f"🎬 Building FFmpeg command for audio mixing...")
+        
+        # Start building the command
+        ffmpeg_cmd = ["ffmpeg"]
+        
+        # Add video input
+        ffmpeg_cmd.extend(["-i", abs_video_path])
+        
+        # Add all audio inputs
+        for track in validated_tracks:
+            ffmpeg_cmd.extend(["-i", track['path']])
+        
+        # Build filter_complex for audio mixing
+        filter_parts = []
+        audio_inputs = []
+        
+        # Process original video audio
+        filter_parts.append(f"[0:a]volume={video_volume}[original_audio]")
+        audio_inputs.append("[original_audio]")
+        
+        # Process each music track with timing and volume
+        for i, track in enumerate(validated_tracks):
+            input_idx = i + 1  # Input 0 is video, audio tracks start from 1
+            track_label = f"music_{i}"
+            
+            # Apply volume and timing to each track
+            # Use adelay to offset the start time, and atrim to limit duration
+            start_delay_ms = int(track['start'] * 1000)  # Convert to milliseconds
+            duration_s = track['duration']
+            end_time = duration_s + track['start']
+            
+            if track['start'] > 0:
+                # Add delay for start time and trim for duration
+                filter_parts.append(f"[{input_idx}:a]volume={music_volume},adelay={start_delay_ms}|{start_delay_ms},atrim=0:{end_time}[{track_label}]")
+            else:
+                # No delay needed, just trim duration
+                filter_parts.append(f"[{input_idx}:a]volume={music_volume},atrim=0:{duration_s}[{track_label}]")
+            
+            audio_inputs.append(f"[{track_label}]")
+        
+        # Mix all audio inputs together
+        mix_inputs = "".join(audio_inputs)
+        num_inputs = len(audio_inputs)
+        filter_parts.append(f"{mix_inputs}amix=inputs={num_inputs}:duration=first:dropout_transition=0[mixed_audio]")
+        
+        # Combine all filter parts
+        filter_complex = ";".join(filter_parts)
+        
+        # Add filter_complex to command
+        ffmpeg_cmd.extend(["-filter_complex", filter_complex])
+        
+        # Map video and mixed audio to output
+        ffmpeg_cmd.extend(["-map", "0:v", "-map", "[mixed_audio]"])
+        
+        # Output settings
+        ffmpeg_cmd.extend([
+            "-c:v", "copy",  # Copy video stream without re-encoding
+            "-c:a", "aac",   # Encode audio as AAC
+            "-b:a", "128k",  # Audio bitrate
+            "-y",            # Overwrite output file
+            abs_output_path
+        ])
+        
+        print(f"🎵 Executing FFmpeg audio mixing...")
+        # Build track names for display
+        track_names = [f'-i {os.path.basename(t["path"])}' for t in validated_tracks]
+        track_display = ' '.join(track_names)
+        print(f"   Command: ffmpeg -i video {track_display} -filter_complex '...' -map 0:v -map '[mixed_audio]' output.mp4")
+        
+        # Execute FFmpeg command
+        result = subprocess.run(
+            ffmpeg_cmd,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        # Verify output file was created
+        if not os.path.exists(abs_output_path):
+            raise RuntimeError("FFmpeg completed but output file was not created")
+        
+        output_size = os.path.getsize(abs_output_path)
+        print(f"✅ Background music added successfully!")
+        print(f"   📁 Output: {os.path.basename(abs_output_path)}")
+        print(f"   📊 Size: {output_size / (1024*1024):.1f} MB")
+        print(f"   🎼 Music tracks mixed: {len(validated_tracks)}")
+        
+        return abs_output_path
+        
+    except subprocess.CalledProcessError as e:
+        error_msg = f"FFmpeg failed with exit code {e.returncode}"
+        if e.stderr:
+            error_msg += f"\nSTDERR: {e.stderr}"
+        if e.stdout:
+            error_msg += f"\nSTDOUT: {e.stdout}"
+        
+        print(f"❌ Audio mixing failed: {error_msg}")
+        raise RuntimeError(f"Audio mixing failed: {error_msg}")
+        
+    except Exception as e:
+        print(f"❌ Audio mixing failed: {str(e)}")
+        raise RuntimeError(f"Audio processing failed: {str(e)}")
+
 def crop_and_stitch_video_segments(video_filepath: str, segments: List[Dict], output_path: str) -> str:
     """
     Crop video segments and stitch them together into a final video.
@@ -625,28 +796,78 @@ def process_multi_video_pipeline(job_id: str, multi_video_job_status: Dict[str, 
         print(f"❌ Multi-video pipeline failed (Job: {job_id}): {str(e)}") 
 
 if __name__ == "__main__":
-    example_timestamps = [
-        {
-            "start": 5,
-            "end": 10,
-        },
-        {
-            "start": 15,
-            "end": 20,
-        },
-        {
-            "start": 25,
-            "end": 30,
-        },
-        {
-            "start": 55,
-            "end": 60,
+    import sys
+    
+    if len(sys.argv) > 1 and sys.argv[1] == "--test-crop":
+        # Test video cropping and stitching
+        example_timestamps = [
+            {
+                "start": 5,
+                "end": 10,
+            },
+            {
+                "start": 15,
+                "end": 20,
+            },
+            {
+                "start": 25,
+                "end": 30,
+            },
+            {
+                "start": 55,
+                "end": 60,
+            }
+        ]
+        filename = '../videos/tom_and_jerry_trailer_no_music.mp4'
+        output_path = '../processed_videos/tom_and_jerry_cropped.mp4'
+        
+        path = crop_and_stitch_video_segments(filename, example_timestamps, output_path)
+        
+        print(f"✅ Video cropping completed successfully for '{filename}'!")
+        print(f"   📁 Output: {os.path.basename(output_path)}")
+        
+    elif len(sys.argv) > 1 and sys.argv[1] == "--test-music":
+        # Test adding music to video
+        video_path = '../videos/tom_and_jerry_trailer_no_music.mp4'
+        music_tracks = {
+            '../music/classical/sad.mp3': {
+                'start': 0,
+                'end': 7,
+            },
+            '../music/classical/dramatic.mp3': {
+                'start': 7,
+                'end': 14
+            },
+            '../music/classical/happy.mp3': {
+                'start': 14,
+                'end': 20
+            }
         }
-    ]
-    filename = '../videos/tom_and_jerry_trailer_no_music.mp4'
-    output_path = '../processed_videos/tom_and_jerry.mp4'
-    
-    path = crop_and_stitch_video_segments(filename, example_timestamps, output_path)
-    
-    print(f"✅ Video processing completed successfully for '{filename}'!")
-    print(f"   📁 Output: {os.path.basename(output_path)}")
+        output_path = '../processed_videos/tom_and_jerry_with_music.mp4'
+        
+        # Check if music files exist, create mock example if not
+        existing_tracks = {}
+        for music_file, timing in music_tracks.items():
+            if os.path.exists(music_file):
+                existing_tracks[music_file] = timing
+            else:
+                print(f"⚠️ Music file not found: {music_file}")
+        
+        if existing_tracks:
+            path = add_music_to_video(video_path, existing_tracks, output_path)
+            print(f"✅ Music mixing completed successfully!")
+            print(f"   📁 Output: {os.path.basename(output_path)}")
+        else:
+            print("❌ No valid music files found for testing")
+            
+    else:
+        print("🎬 Pipeline Test Functions")
+        print("Usage:")
+        print("  python pipeline.py --test-crop    # Test video cropping and stitching")
+        print("  python pipeline.py --test-music   # Test adding background music")
+        print("")
+        print("Make sure test files exist:")
+        print("  ../videos/tom_and_jerry_trailer_no_music.mp4")
+        print("  ../audio/background_music1.mp3 (for music test)")
+        print("  ../audio/dramatic_theme.mp3 (for music test)")
+        print("  ../audio/upbeat_ending.mp3 (for music test)")

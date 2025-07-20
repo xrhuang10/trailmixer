@@ -74,39 +74,13 @@ def upload_video(video_files: List[UploadFile] = File(...)):
     
     print(f"🚀 Processing {len(video_files)} video(s) for stitching")
     
-     # Create upload directory
+    # Create upload directory
     upload_dir = "uploads"
     os.makedirs(upload_dir, exist_ok=True)
     # Generate unique job ID
     job_id = str(uuid.uuid4())
 
-    file_paths = []
-
-    orig_filename = video_file.filename
-    file_path = os.path.join(upload_dir, f"{job_id}_{orig_filename}")
-    try:
-        with open(file_path, "wb") as buffer:
-            content = video_file.file.read()
-            buffer.write(content)
-        
-        # If it's a .mov, convert to .mp4 and use the new path
-        if orig_filename.lower().endswith('.mov'):
-            try:
-                converted_path = convert_mov_to_mp4(file_path)
-                os.remove(file_path)  # Optional: remove original .mov
-                file_path = converted_path
-                # Also update filename for the rest of the pipeline
-                video_file.filename = os.path.basename(converted_path)
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=f"FFmpeg conversion failed: {str(e)}")
-        
-        file_paths.append(file_path)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save file {i+1}: {str(e)}")
-    finally:
-        video_file.file.close()
-    
-    # Save uploaded files as temporary files
+    # Save uploaded files to upload directory with MOV conversion support
     temp_files = []
     uploaded_filenames = []
     
@@ -117,27 +91,35 @@ def upload_video(video_files: List[UploadFile] = File(...)):
             if not video_file.filename:
                 raise HTTPException(status_code=400, detail=f"Filename for file {i+1} is required")
             
-            # Create temporary file with proper extension
-            file_extension = os.path.splitext(video_file.filename)[1] or '.mp4'
-            temp_file = tempfile.NamedTemporaryFile(
-                delete=False,
-                suffix=file_extension,
-                prefix=f"upload_{job_id}_{i}_"
-            )
+            orig_filename = video_file.filename
+            file_path = os.path.join(upload_dir, f"{job_id}_{i+1}_{orig_filename}")
             
             try:
-                # Save uploaded content to temporary file
-                content = video_file.file.read()
-                temp_file.write(content)
-                temp_file.flush()
+                # Save uploaded content to file
+                with open(file_path, "wb") as buffer:
+                    content = video_file.file.read()
+                    buffer.write(content)
                 
-                temp_files.append(temp_file.name)
-                uploaded_filenames.append(video_file.filename)
-                print(f"📁 Saved temp video {i+1}/{len(video_files)}: {video_file.filename}")
-                print(f"   Temp path: {temp_file.name}")
+                # If it's a .mov, convert to .mp4 and use the new path
+                if orig_filename.lower().endswith('.mov'):
+                    try:
+                        converted_path = convert_mov_to_mp4(file_path)
+                        os.remove(file_path)  # Remove original .mov
+                        file_path = converted_path
+                        # Update filename for the rest of the pipeline
+                        orig_filename = os.path.basename(converted_path)
+                        print(f"🔄 Converted MOV to MP4: {orig_filename}")
+                    except Exception as e:
+                        raise HTTPException(status_code=500, detail=f"FFmpeg conversion failed: {str(e)}")
                 
+                temp_files.append(file_path)
+                uploaded_filenames.append(orig_filename)
+                print(f"📁 Saved video {i+1}/{len(video_files)}: {orig_filename}")
+                print(f"   Path: {file_path}")
+                
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Failed to save file {i+1}: {str(e)}")
             finally:
-                temp_file.close()
                 video_file.file.close()
         
         # Stitch videos together if multiple videos uploaded
@@ -202,7 +184,7 @@ def upload_video(video_files: List[UploadFile] = File(...)):
             )
             
             # Use upload pipeline as helper function (runs steps 1-3)
-            upload_video_pipeline(temp_job_id, temp_job_status)
+            # upload_video_pipeline(temp_job_id, temp_job_status)
             
             # Get results from the pipeline
             temp_job = temp_job_status[temp_job_id]
