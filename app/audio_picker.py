@@ -48,20 +48,104 @@ def map_sentiment_to_filename(sentiment: str) -> str:
 def get_music_file_paths(analysis_file_path: str) -> dict[str, dict[str, Any]]:
     with open(analysis_file_path, 'r') as f:
         analysis_data = json.load(f)
-    tracks = analysis_data.get('music', {}).get('tracks', [])
+    
+    print(f"🔍 DEBUG: get_music_file_paths analysis_data")
+    print(f"   Analysis data type: {type(analysis_data)}")
+    print(f"   Analysis data content: {analysis_data}")
+    
+    # Handle different data structures
+    tracks = []
+    if isinstance(analysis_data, dict):
+        # Check if music key exists and what it contains
+        music_data = analysis_data.get('music', {})
+        print(f"   Music data type: {type(music_data)}")
+        print(f"   Music data content: {music_data}")
+        
+        if isinstance(music_data, list):
+            # Music data is directly a list of tracks
+            tracks = music_data
+            print(f"   Found tracks as direct list: {len(tracks)}")
+        elif isinstance(music_data, dict):
+            # Music data is a dict with 'tracks' key
+            tracks = music_data.get('tracks', [])
+            print(f"   Found tracks in dict structure: {len(tracks)}")
+        else:
+            print(f"   ⚠️ Unknown music data type: {type(music_data)}")
+            tracks = []
+    elif isinstance(analysis_data, list):
+        # Handle case where analysis_data is a list (possibly segments)
+        print("⚠️ Analysis data is a list - checking if it contains tracks")
+        # Look for any music/track info in the list
+        for item in analysis_data:
+            if isinstance(item, dict) and 'music' in item:
+                tracks.extend(item.get('music', {}).get('tracks', []))
+            elif isinstance(item, dict) and any(key in item for key in ['style', 'sentiment', 'start', 'end']):
+                # This looks like a track itself
+                tracks.append(item)
+        print(f"   Extracted tracks from list structure: {len(tracks)}")
+    else:
+        print(f"⚠️ Unknown analysis_data type: {type(analysis_data)}")
+        tracks = []
     
     music_file_paths = {}
-    for track in tracks:
-        track_dict = {}
-        
-        track_dict['style'] = track['style']
-        track_dict['sentiment'] = track['sentiment']
-        track_dict['intensity'] = track['intensity']
-        track_dict['start'] = track['start']
-        track_dict['end'] = track['end']
-        
-        filename = os.path.join('..', 'music', track['style'], f'{track['sentiment']}.mp3')
-        music_file_paths[filename] = track_dict
+    print(f"🎵 Processing {len(tracks)} tracks for music file paths")
+    
+    for i, track in enumerate(tracks):
+        try:
+            print(f"   Track {i} type: {type(track)}")
+            print(f"   Track {i} content: {track}")
+            
+            # Handle different track data types
+            if isinstance(track, dict):
+                track_dict = {}
+                
+                # Extract with defaults for missing fields
+                track_dict['style'] = track.get('style', 'Pop')
+                track_dict['sentiment'] = track.get('sentiment', 'calm')
+                track_dict['intensity'] = track.get('intensity', 'medium')
+                track_dict['start'] = track.get('start', i * 20)
+                track_dict['end'] = track.get('end', (i + 1) * 20)
+                
+                # Create filename with fallback values
+                style = track_dict['style'].lower()
+                sentiment = track_dict['sentiment'].lower()
+                filename = os.path.join('..', 'music', style, f'{sentiment}.mp3')
+                music_file_paths[filename] = track_dict
+                
+                print(f"   ✅ Added track {i}: {filename} ({track_dict['start']}s - {track_dict['end']}s)")
+                
+            elif isinstance(track, list):
+                print(f"   ⚠️ Track {i} is a list, skipping: {track}")
+                continue
+            else:
+                print(f"   ⚠️ Unknown track type {type(track)}, creating default")
+                # Create default track
+                track_dict = {
+                    'style': 'Pop',
+                    'sentiment': 'calm',
+                    'intensity': 'medium',
+                    'start': i * 20,
+                    'end': (i + 1) * 20
+                }
+                filename = os.path.join('..', 'music', 'pop', 'calm.mp3')
+                music_file_paths[filename] = track_dict
+                print(f"   🔄 Created default track {i}: {filename}")
+                
+        except Exception as track_error:
+            print(f"   ❌ Error processing track {i}: {track_error}")
+            # Create fallback track to prevent total failure
+            track_dict = {
+                'style': 'Pop',
+                'sentiment': 'calm',
+                'intensity': 'medium',
+                'start': i * 20,
+                'end': (i + 1) * 20
+            }
+            filename = os.path.join('..', 'music', 'pop', 'calm.mp3')
+            music_file_paths[filename] = track_dict
+            print(f"   🔄 Created fallback track {i}: {filename}")
+    
+    print(f"✅ Generated {len(music_file_paths)} music file paths")
         
     return music_file_paths
 
