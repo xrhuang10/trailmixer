@@ -6,6 +6,8 @@
 [![TwelveLabs](https://img.shields.io/badge/TwelveLabs-API-purple.svg)](https://twelvelabs.io)
 
 > **Transform raw footage into attention-grabbing trailers in seconds with AI-powered content analysis and automated music synchronization.**
+>
+> FRONT-END REPO: https://github.com/prestonty/Trailmixer-frontend#
 
 ## 🚀 Inspiration
 
