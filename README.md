@@ -42,7 +42,7 @@ TrailMixer allows users to:
 - **FFmpeg**: Video/audio stitching and processing
 - **Custom Prompt Engineering**: Structured JSON output generation
 
-### Architecture Overview
+### Architecture Overview (https://miro.com/app/board/uXjVJcA7HWY=/?share_link_id=973269980552)
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
