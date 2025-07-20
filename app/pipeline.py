@@ -3,7 +3,9 @@ Background processing pipelines for video processing
 """
 import re
 import os
-from typing import Dict
+import tempfile
+import subprocess
+from typing import Dict, List
 from models import (
     JobStatus, JobInfo, MultiVideoJobInfo, SentimentAnalysisRequest, SentimentAnalysisData,
     VideoProcessingRequest, AudioLibrary, VideoAnalysisResult, MultiVideoFFmpegRequest, FfmpegRequest
@@ -16,6 +18,193 @@ from prompts.extract_info import extract_info_prompt
 from twelvelabs_client import upload_video_to_twelvelabs
 from audio_picker import get_music_file_paths
 from ffmpeg_stitch import stitch_ffmpeg_request
+
+def stitch_videos_together(video_file_paths: List[str], output_path: str) -> str:
+    """
+    Stitch a list of videos together into a single video using FFmpeg
+    
+    Args:
+        video_file_paths: List of paths to video files to concatenate
+        output_path: Path where the stitched video should be saved
+        
+    Returns:
+        str: Path to the output video file
+        
+    Raises:
+        RuntimeError: If FFmpeg processing fails
+        ValueError: If input validation fails
+    """
+    if not video_file_paths:
+        raise ValueError("No video files provided for stitching")
+    
+    if len(video_file_paths) == 1:
+        print(f"⚠️ Only one video provided, copying to output path")
+        import shutil
+        shutil.copy2(video_file_paths[0], output_path)
+        return output_path
+    
+    print(f"🔗 Stitching {len(video_file_paths)} videos together...")
+    print(f"📁 Output: {os.path.basename(output_path)}")
+    
+    # Validate input files exist and normalize paths
+    normalized_paths = []
+    for i, video_path in enumerate(video_file_paths):
+        # Convert to absolute path and normalize separators
+        abs_path = os.path.abspath(video_path)
+        if not os.path.exists(abs_path):
+            raise ValueError(f"Video file {i+1} not found: {abs_path}")
+        normalized_paths.append(abs_path)
+        print(f"   📹 Input {i+1}: {os.path.basename(abs_path)}")
+        print(f"       Path: {abs_path}")
+    
+    # Create temporary file list for FFmpeg concat demuxer
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, dir=os.getcwd()) as temp_file:
+        temp_list_path = temp_file.name
+        
+        # Write file list in FFmpeg concat format
+        for video_path in normalized_paths:
+            # On Windows, use forward slashes and escape properly for FFmpeg
+            if os.name == 'nt':  # Windows
+                # Convert backslashes to forward slashes for FFmpeg
+                ffmpeg_path = video_path.replace('\\', '/')
+                # Escape single quotes if any
+                ffmpeg_path = ffmpeg_path.replace("'", "'\"'\"'")
+            else:
+                # Unix-like systems
+                ffmpeg_path = video_path.replace("'", "'\"'\"'")
+            
+            temp_file.write(f"file '{ffmpeg_path}'\n")
+            print(f"       FFmpeg path: {ffmpeg_path}")
+    
+    try:
+        print(f"📝 Created temporary file list: {temp_list_path}")
+        
+        # Normalize output path
+        abs_output_path = os.path.abspath(output_path)
+        
+        # Build FFmpeg command for concatenation
+        ffmpeg_cmd = [
+            "ffmpeg",
+            "-f", "concat",           # Use concat demuxer
+            "-safe", "0",             # Allow unsafe file paths
+            "-i", temp_list_path,     # Input file list
+            "-c", "copy",             # Copy streams without re-encoding (fastest)
+            "-y",                     # Overwrite output file
+            abs_output_path
+        ]
+        
+        print(f"🎬 Running FFmpeg concatenation...")
+        print(f"Command: {' '.join(ffmpeg_cmd)}")
+        
+        # Execute FFmpeg command
+        result = subprocess.run(
+            ffmpeg_cmd,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        # Check if output file was created
+        if not os.path.exists(abs_output_path):
+            raise RuntimeError("FFmpeg completed but output file was not created")
+        
+        # Get output file size for verification
+        output_size = os.path.getsize(abs_output_path)
+        print(f"✅ Video stitching completed successfully!")
+        print(f"   📁 Output: {os.path.basename(abs_output_path)}")
+        print(f"   📊 Size: {output_size / (1024*1024):.1f} MB")
+        
+        return abs_output_path
+        
+    except subprocess.CalledProcessError as e:
+        error_msg = f"FFmpeg failed with exit code {e.returncode}"
+        if e.stderr:
+            error_msg += f"\nSTDERR: {e.stderr}"
+        if e.stdout:
+            error_msg += f"\nSTDOUT: {e.stdout}"
+        
+        print(f"❌ Video stitching failed: {error_msg}")
+        raise RuntimeError(f"Video stitching failed: {error_msg}")
+        
+    except Exception as e:
+        print(f"❌ Unexpected error during video stitching: {str(e)}")
+        raise RuntimeError(f"Video stitching failed: {str(e)}")
+        
+    finally:
+        # Clean up temporary file list
+        try:
+            if os.path.exists(temp_list_path):
+                os.unlink(temp_list_path)
+                print(f"🧹 Cleaned up temporary file: {temp_list_path}")
+        except Exception as cleanup_error:
+            print(f"⚠️ Failed to clean up temporary file: {cleanup_error}")
+
+def upload_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
+    """Complete video processing pipeline"""
+    job = job_status[job_id]
+    filename = job.filename
+    input_file = os.path.basename(job.file_path)
+    
+    print(f"\n🚀 Starting video processing pipeline")
+    print(f"   🆔 Job ID: {job_id}")
+    print(f"   📁 File: {filename}")
+    print(f"   📍 Path: {input_file}")
+    
+    try:
+        # Step 1: Upload to Twelve Labs for indexing
+        job.status = JobStatus.INDEXING
+        job.message = f"Uploading '{filename}' to Twelve Labs for AI analysis..."
+        print(f"📤 Step 1: Uploading '{filename}' to Twelve Labs...")
+        
+        file_path = job.file_path
+        video_id = upload_video_to_twelvelabs(file_path)
+        
+        if not video_id:
+            raise RuntimeError(f"Failed to upload '{filename}' to Twelve Labs")
+        
+        job.twelve_labs_video_id = video_id
+        job.status = JobStatus.ANALYZING
+        job.message = f"Analyzing sentiment for '{filename}' with AI..."
+        print(f"✅ Upload successful! Video ID: {video_id}")
+        
+        # Step 2: Perform sentiment analysis
+        print(f"🤖 Step 2: Analyzing sentiment for '{filename}'...")
+        sentiment_request = SentimentAnalysisRequest(video_id=video_id, prompt=extract_info_prompt)
+        sentiment_result = analyze_sentiment_with_twelvelabs(sentiment_request)
+        job.sentiment_analysis = sentiment_result
+        
+        if not sentiment_result.success:
+            raise RuntimeError(f"Sentiment analysis failed for '{filename}': {sentiment_result.error_message}")
+        
+        # Step 3: Select background audio based on sentiment analysis
+        print(f"🎵 Step 3: Selecting background music tracks for '{filename}' based on AI analysis...")
+        if job.sentiment_analysis.file_path:
+            filepath = re.sub(r'\\+', '/', job.sentiment_analysis.file_path)
+            print(f"File path: {filepath}")
+            music_file_paths = get_music_file_paths(filepath)
+            print(f"🎵 Found {len(music_file_paths)} music file paths")
+        else:
+            print("❌ No sentiment analysis file path available for music selection")
+        print(f"Music file paths: {music_file_paths}")
+        
+        # Testing if the music file paths are valid
+        all_exist = True
+        for path in music_file_paths:
+            if not os.path.isfile(path):
+                print(f"❌ File does not exist: {path}")
+                all_exist = False
+            else:
+                print(f"✅ File exists: {path}")
+        if all_exist:
+            print("All music file paths are valid.")
+        else:
+            print("Some music file paths are invalid.")
+            
+        print("Step 3 complete!")
+    except Exception as e:
+        job.status = JobStatus.FAILED
+        job.message = f"Processing failed for '{filename}': {str(e)}"
+        print(f"❌ Pipeline failed for '{filename}' (Job: {job_id}): {str(e)}")
 
 def process_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
     """Complete video processing pipeline"""
