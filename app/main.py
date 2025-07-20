@@ -548,7 +548,7 @@ def download_processed_video(job_id: str):
     Download the final processed video file (mocked with speed video)
     """
     # Mock implementation - return a speed video from videos directory
-    mock_video_path = "videos/speed.mp4"
+    mock_video_path = "../videos/speed.mp4"
     
     if not os.path.exists(mock_video_path):
         raise HTTPException(status_code=404, detail="Mock speed video file not found")
