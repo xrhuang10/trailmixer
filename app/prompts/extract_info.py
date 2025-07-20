@@ -170,12 +170,6 @@ twelvelabs_output_schema = {
         }
     }
 }
- 
-
-desired_length = 30  # in seconds
-music_style = "Pop"  # One of: Classical, Hip Hop, Pop, Electronic, Meme
-num_tracks = 3
-sentiment_list = ["happy", "sad", "energetic", "calm", "dramatic", "romantic", "suspenseful"]
 
 # # Track format
 # song_format = {
@@ -253,62 +247,82 @@ sentiment_list = ["happy", "sad", "energetic", "calm", "dramatic", "romantic", "
 # Now take a deep breath and start analyzing the video.
 # """
 
+desired_length = 100  # in seconds
+music_style = ["pop", "hiphop", "electronic", "classical", "meme"]  # One of: Classical, HipHop, Pop, Electronic, Meme
+num_tracks = 3
+sentiment_list = ["happy", "sad", "energetic", "calm", "dramatic", "romantic", "suspenseful"]
 
 extract_info_prompt = f"""
-You are a professional video analyst that extracts information from videos for picking the best suited music for scenes in a video and giving general music suggestions.
-The final output is a trailer video with a HARD cut off length of {desired_length} seconds. The trailer video cannot exceed this length.
+You are a professional video analyst creating a {desired_length}-second trailer. 
 
-Given a video and the desired Trailers  length, you must
-1. Analyze and break video into logical segments based on mood, content, or scene/highlight changes.
-2. Only choose the most important segments to KEEP, The total length of the segments (each segment length calculated as end_time - start_time) must be less than or equal to the trailer length of {desired_length} seconds which is the final product.
-3. When segments total time is greater than the desired trailer length, start removing segments in the trailer until the total length of the segments drops below {desired_length} seconds.
-4. Propose {num_tracks} suitable music track(s) based on the mood and pacing of the selected segments.
+**🚨 CRITICAL MATHEMATICAL CONSTRAINT 🚨**
+THE TOTAL DURATION MUST EQUAL EXACTLY {desired_length} SECONDS. NOT {desired_length-1}, NOT {desired_length+1}, EXACTLY {desired_length}.
 
-Each segment must include:
-- "start_time": (number, in seconds)
-- "end_time": (number, in seconds)
-- "sentiment": the mood of the segment
-- "music_style": strictly "{music_style}"
-- "include": true or false (true if segment is included in the cropped final trailer)
+**APPROACH EXAMPLE:**
+For a 300-second original video → 100-second trailer:
+- Select segments with varying lengths (5s, 12s, 8s, 15s, 6s, 10s, 14s, 7s, 11s, 12s = EXACTLY 100s total)
+- VERIFY: 5+12+8+15+6+10+14+7+11+12 = 100 seconds EXACTLY
+- Spread across timeline but TOTAL MUST EQUAL {desired_length} SECONDS
 
-The end_time - start_time of each segment is the segment's duration. All segment durations added together must be less than the desired trailer length of {desired_length} seconds.
+**ABSOLUTE NON-NEGOTIABLE REQUIREMENTS:**
+1. TOTAL DURATION = EXACTLY {desired_length} SECONDS (ZERO TOLERANCE FOR DEVIATION)
+2. MANDATORY MATH CHECK: Sum all segment durations before finalizing - MUST equal {desired_length}
+3. Segments must NOT be consecutive - spread them throughout the original video timeline
+4. Segment lengths should match content importance BUT total must be {desired_length} seconds
+5. If segments total > {desired_length}: REMOVE segments until exactly {desired_length}
+6. If segments total < {desired_length}: EXTEND segments until exactly {desired_length}
+7. Sum of ALL music track durations = EXACTLY {desired_length} seconds
+8. Number of music tracks = EXACTLY {num_tracks}
+9. Each track's music style MUST be selected from: {music_style}
 
----
+**WARNING: IF THE VIDEO EXCEEDS {desired_length} SECONDS, THE OUTPUT IS INVALID AND REJECTED**
 
+**SEGMENT ANALYSIS:**
+- Break video into logical segments based on mood/content changes and narrative importance
+- Segment lengths should be DYNAMIC based on content importance:
+  * High-impact moments: 8-15 seconds (emotional peaks, action sequences, climaxes)
+  * Mood transitions: 5-10 seconds (dialogue, character moments, setup scenes)
+  * Quick highlights: 3-8 seconds (brief exciting moments, reaction shots, reveals)
+  * Key scenes: 10-15 seconds (important story beats, memorable moments)
+- CRITICAL: Segments must NOT be consecutive - create a highlight reel from across the entire video
+- NATURAL SPACING: Distribute segments throughout the video timeline for variety and storytelling flow
+- CONTENT-AWARE: Choose segments that showcase different aspects of the video (beginning, middle, end)
+- Mark segments as "include": true/false to reach exactly {desired_length} seconds total
+- ABSOLUTE PRIORITY: Duration precision over content preference - {desired_length} seconds is NON-NEGOTIABLE
 
-**Constraints for Music Tracks:**
-- The number of tracks must be exactly {num_tracks}.
-- The total duration of the audio tracks combined MUST equal the total duration of `"include": true` segments.
-- Track time ranges must not overlap.
-- All timestamps must be numeric values in seconds.
-- This duration of all tracks combined must NOT exceed the MAX trailer length of {desired_length} seconds.
-- Each track must use a **unique combination** of `style` and `sentiment`.
-- Track sentiment must be a single word strictly from: "happy", "sad", "energetic", "calm", "dramatic", "romantic", "suspenseful".
+**SEGMENT FORMAT:**
+- "start_time": (number in seconds)
+- "end_time": (number in seconds) 
+- "sentiment": MUST be one of: {sentiment_list}
+- "music_style": MUST be one of: {music_style}
+- "include": true/false (only true segments count toward {desired_length}s)
 
----
+**MUSIC TRACK CONSTRAINTS:**
+- Exactly {num_tracks} tracks
+- Each track covers a time range of the included segments
+- No overlapping track times, no gaps between tracks
+- CRITICAL: Each track MUST have a DIFFERENT style-sentiment combination
+- Example: Track 1: "pop-happy", Track 2: "electronic-energetic", Track 3: "classical-dramatic"
+- Track sentiment MUST be from: {sentiment_list}
+- Track style MUST be one of: {music_style}
+- EMPHASIS: Do NOT use any music style outside of {music_style}
 
-**General Rules:**
-- Segments should be at least 4 seconds long. Remove them if they are less than 4 seconds long.
-- Segments must not overlap or leave gaps between included portions.
-- Use the most emotionally or narratively meaningful scenes, BUT ABOVE ALL, make sure the total sum of durations of all the segments equals the user's desired trailer length of {desired_length} seconds.
-- Prioritize time over meaningfulness. This means you can drop some segments or add some segments, even if they are not meaningful, as long as doing so will get to the desired trailer length of {desired_length} seconds.
-- All timestamps must be in numeric seconds (e.g., 14.5 — not "00:14").
-- Only use the full video if its total length is less than the user's desired trailer length.
+**MANDATORY VALIDATION CHECKLIST:**
+□ CRITICAL: Sum of (end_time - start_time) for "include": true segments = EXACTLY {desired_length}
+□ CRITICAL: Sum of (end - start) for all music tracks = EXACTLY {desired_length}
+□ VERIFY MATH: Calculate each segment duration and add them up = {desired_length} seconds
+□ Number of music tracks = EXACTLY {num_tracks}
+□ Segments are NOT consecutive - spread throughout original video with natural gaps
+□ Segment lengths match content importance but TOTAL must equal {desired_length}
+□ All sentiments from allowed list: {sentiment_list}
+□ All music_style from allowed list: {music_style}
+□ Each track has DIFFERENT style-sentiment combination from other tracks
+□ All timestamps are numeric seconds
+□ FINAL CHECK: Does the math add up to {desired_length} seconds? YES/NO
 
-**Also return:**
-- Original video length (DO NOT CONFUSE WITH DESIRED TRAILER LENGTH). Original video length is always greater than the trailer length.
-- Overall mood/sentiment of the full video
-
-
-**IMPORTANT:**
-- AIM to have {desired_length / 10} segments.
-- AIM to have an exactly {desired_length} second video total when summing up (end - start) for each
-- Avoid including segments over 20 seconds calculated by (end - start)
-- Reminder: the desired trailer length is {desired_length} seconds which the trailer length cannot exceed.
-- Music must reflect the dominant mood and pacing of selected segments.
-- Each music track must have a **distinct combination** of style and sentiment.
-- EXTREMELY IMPORTANT: Return ONLY the final JSON using this exact format WITH NO ADDITIONAL TEXT:
+**REQUIRED OUTPUT:**
+Return ONLY valid JSON in this exact format:
 {json.dumps(twelvelabs_output_schema, indent=4)}
 
-Now take a deep breath and start analyzing the video.
+CALCULATE DURATIONS PRECISELY. The total of ALL selected segments MUST equal EXACTLY {desired_length} seconds. Use dynamic lengths based on content importance, spread throughout the original video, but the mathematical requirement of {desired_length} seconds total is ABSOLUTE and NON-NEGOTIABLE.
 """

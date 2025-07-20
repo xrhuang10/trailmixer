@@ -23,6 +23,8 @@ from models import (
 # Import processing modules
 from pipeline import stitch_videos_together, crop_and_stitch_video_segments, add_music_to_video, upload_video_pipeline
 from video_processor import extract_segments
+from prompts.extract_info import extract_info_prompt
+from twelvelabs_client import prompt_twelvelabs
 
 app = FastAPI(title="TrailMixer Video Processing API")
 
@@ -80,7 +82,7 @@ def upload_video(video_files: List[UploadFile] = File(...)):
     os.makedirs(upload_dir, exist_ok=True)
     # Generate unique job ID
     job_id = str(uuid.uuid4())
-
+    
     # Save uploaded files to upload directory with MOV conversion support
     temp_files = []
     uploaded_filenames = []
@@ -437,6 +439,204 @@ class DownloadProcessedVideoRequest(BaseModel):
             }
         }
 
+# Request model for custom video analysis with prompt parameters
+class CustomAnalysisRequest(BaseModel):
+    """Request for analyzing a video with custom prompt parameters"""
+    job_id: str = Field(..., description="Job ID of the uploaded video to analyze")
+    desired_length: int = Field(..., ge=10, le=300, description="Target trailer length in seconds (10-300)")
+    num_tracks: int = Field(..., ge=1, le=10, description="Number of music tracks to generate (1-10)")
+    music_style: List[str] = Field(
+        ..., 
+        description="List of allowed music styles (subset of allowed styles)",
+        example=["pop", "electronic", "classical"]
+    )
+    sentiment_list: Optional[List[str]] = Field(
+        None,
+        description="List of allowed sentiments (optional, uses defaults if not provided)",
+        example=["happy", "energetic", "dramatic"]
+    )
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "job_id": "abc123-def456-ghi789",
+                "desired_length": 60,
+                "num_tracks": 3,
+                "music_style": ["pop", "electronic", "classical"],
+                "sentiment_list": ["happy", "energetic", "dramatic", "calm"]
+            }
+        }
+
+# Response model for custom analysis
+class CustomAnalysisResponse(BaseModel):
+    """Response from custom video analysis"""
+    job_id: str = Field(..., description="Job ID of the analyzed video")
+    analysis_complete: bool = Field(..., description="Whether analysis completed successfully")
+    message: str = Field(..., description="Status message")
+    prompt_parameters: Dict[str, Any] = Field(..., description="Parameters used for the analysis prompt")
+    analysis_data: Optional[Dict[str, Any]] = Field(None, description="Raw analysis data from TwelveLabs")
+    segment_timestamps: Optional[List[Dict[str, Any]]] = Field(None, description="Extracted segment timestamps")
+    music_file_paths: Optional[Dict[str, Dict[str, Any]]] = Field(None, description="Generated music file paths")
+    error_message: Optional[str] = Field(None, description="Error message if analysis failed")
+
+@app.post('/api/video/analyze-custom', response_model=CustomAnalysisResponse)
+def analyze_video_custom(request: CustomAnalysisRequest):
+    """
+    Analyze an uploaded video with custom prompt parameters.
+    This allows customization of trailer length, number of tracks, and music styles.
+    """
+    job_id = request.job_id
+    
+    # Check if job exists
+    if job_id not in job_status:
+        raise HTTPException(status_code=404, detail="Job not found. Must upload video first.")
+    
+    job = job_status[job_id]
+    
+    # Check if video has been uploaded to TwelveLabs
+    if not job.twelve_labs_video_id:
+        raise HTTPException(status_code=400, detail="Video not yet uploaded to TwelveLabs. Wait for upload to complete.")
+    
+    try:
+        print(f"🔍 Starting custom analysis for job: {job_id}")
+        print(f"   🎯 Desired length: {request.desired_length}s")
+        print(f"   🎵 Music tracks: {request.num_tracks}")
+        print(f"   🎼 Music styles: {request.music_style}")
+        print(f"   💭 Sentiments: {request.sentiment_list}")
+        
+        # Validate music styles
+        allowed_styles = ["pop", "hiphop", "electronic", "classical", "meme"]
+        for style in request.music_style:
+            if style.lower() not in allowed_styles:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Invalid music style '{style}'. Must be one of: {allowed_styles}"
+                )
+        
+        # Generate custom prompt with provided parameters
+        custom_prompt = extract_info_prompt
+        
+        print(f"✨ Generated custom prompt with {len(custom_prompt)} characters")
+        
+        # Analyze video with custom prompt
+        print(f"🤖 Sending custom analysis request to TwelveLabs...")
+        response = prompt_twelvelabs(job.twelve_labs_video_id, custom_prompt)
+        
+        if not response:
+            raise RuntimeError("No response from TwelveLabs analysis")
+        
+        print(f"✅ TwelveLabs analysis completed")
+        
+        # Parse and clean the response
+        from twelvelabs_client import clean_llm_string_output_to_json
+        analysis_data = clean_llm_string_output_to_json(response.data)
+        
+        print(f"📊 Parsed analysis data with {len(analysis_data.get('segments', []))} segments")
+        
+        # Extract segment timestamps from analysis
+        segments = analysis_data.get('segments', [])
+        segment_timestamps = []
+        for seg in segments:
+            if seg.get('include', False):  # Only include segments marked as True
+                segment_timestamps.append({
+                    'start_time': seg.get('start_time', 0),
+                    'end_time': seg.get('end_time', 10),
+                    'sentiment': seg.get('sentiment', 'happy'),
+                    'intensity': seg.get('intensity', 'medium')
+                })
+        
+        print(f"🎬 Extracted {len(segment_timestamps)} included segments")
+        
+        # Calculate total duration
+        total_duration = sum(seg['end_time'] - seg['start_time'] for seg in segment_timestamps)
+        print(f"⏱️ Total segment duration: {total_duration}s (target: {request.desired_length}s)")
+        
+        # Generate music file paths from analysis
+        music_file_paths = {}
+        try:
+            # Save analysis to temporary file for audio picker
+            import tempfile
+            import json
+            
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
+                json.dump(analysis_data, temp_file, indent=2)
+                temp_analysis_path = temp_file.name
+            
+            # Get music file paths
+            from audio_picker import get_music_file_paths
+            music_file_paths = get_music_file_paths(temp_analysis_path)
+            
+            # Clean up temp file
+            os.unlink(temp_analysis_path)
+            
+            print(f"🎵 Generated {len(music_file_paths)} music track assignments")
+            
+        except Exception as audio_error:
+            print(f"⚠️ Audio selection failed: {audio_error}")
+            music_file_paths = {}
+        
+        # Update job with custom analysis results
+        job.sentiment_analysis = SentimentAnalysisResponse(
+            file_path=f"custom_analysis_{job_id}.json",
+            sentiment_analysis=analysis_data  # Store raw analysis data
+        )
+        job.segment_timestamps = segment_timestamps
+        job.status = JobStatus.PROCESSING
+        job.message = f"Custom analysis completed with {len(segment_timestamps)} segments"
+        
+        # Store analysis parameters for reference
+        prompt_parameters = {
+            "desired_length": request.desired_length,
+            "num_tracks": request.num_tracks,
+            "music_style": request.music_style,
+            "sentiment_list": request.sentiment_list,
+            "total_segment_duration": total_duration,
+            "segments_included": len(segment_timestamps)
+        }
+        
+        print(f"✅ Custom analysis completed successfully")
+        print(f"   📊 Segments: {len(segment_timestamps)}")
+        print(f"   🎵 Music tracks: {len(music_file_paths)}")
+        print(f"   ⏱️ Duration: {total_duration}s / {request.desired_length}s")
+        
+        return CustomAnalysisResponse(
+            job_id=job_id,
+            analysis_complete=True,
+            message=f"Custom analysis completed with {len(segment_timestamps)} segments totaling {total_duration}s",
+            prompt_parameters=prompt_parameters,
+            analysis_data=analysis_data,
+            segment_timestamps=segment_timestamps,
+            music_file_paths=music_file_paths,
+            error_message=None
+        )
+        
+    except ValueError as ve:
+        # Validation errors
+        error_msg = f"Invalid parameters: {str(ve)}"
+        print(f"❌ {error_msg}")
+        raise HTTPException(status_code=400, detail=error_msg)
+        
+    except Exception as e:
+        # General processing errors
+        error_msg = f"Custom analysis failed: {str(e)}"
+        print(f"❌ {error_msg}")
+        
+        return CustomAnalysisResponse(
+            job_id=job_id,
+            analysis_complete=False,
+            message="Custom analysis failed",
+            prompt_parameters={
+                "desired_length": request.desired_length,
+                "num_tracks": request.num_tracks,
+                "music_style": request.music_style,
+                "sentiment_list": request.sentiment_list
+            },
+            analysis_data=None,
+            segment_timestamps=None,
+            music_file_paths=None,
+            error_message=error_msg
+        )
+
 @app.post('/api/video/crop')
 def crop_video(job_id: str):
     """
@@ -645,11 +845,11 @@ def download_processed_video(request: DownloadProcessedVideoRequest):
         
         # Use custom filename for download if provided
         download_filename = f"{request.output_filename}.mp4" if request.output_filename else f"processed_trailer_{job_id}.mp4"
-        
+    
         return FileResponse(
-            path=final_path,
+                path=final_path,
             media_type='video/mp4',
-            filename=download_filename
+                filename=download_filename
         )
         
     except Exception as e:

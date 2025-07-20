@@ -1,5 +1,5 @@
 """
-Background processing pipelines for video processing
+Background processing pipelines for video processing    
 """
 import re
 import os
@@ -19,7 +19,7 @@ from twelvelabs_client import upload_video_to_twelvelabs
 from audio_picker import get_music_file_paths
 from ffmpeg_stitch import stitch_ffmpeg_request
 
-def add_music_to_video(video_filepath: str, music_tracks: Dict[str, Dict], output_path: str, video_volume: float = 1.0, music_volume: float = 0.3) -> str:
+def add_music_to_video(video_filepath: str, music_tracks: Dict[str, Dict], output_path: str, video_volume: float = 1.0, music_volume: float = 0.25) -> str:
     """
     Add background music tracks to a video at specified timestamps.
     
@@ -220,6 +220,7 @@ def crop_and_stitch_video_segments(video_filepath: str, segments: List[Dict], ou
     print(f"   📁 Input: {os.path.basename(video_filepath)}")
     print(f"   📊 Segments: {len(segments)}")
     print(f"   📁 Output: {os.path.basename(output_path)}")
+    print(f"   ⚡ Method: Fast copy with fallback re-encoding for compatibility")
     
     # Validate segments
     for i, segment in enumerate(segments):
@@ -246,7 +247,19 @@ def crop_and_stitch_video_segments(video_filepath: str, segments: List[Dict], ou
         temp_dir = tempfile.mkdtemp(prefix="video_segments_")
         print(f"📁 Created temporary directory: {temp_dir}")
         
-        # Crop each segment using FFmpeg
+        # Detect input video properties for better processing
+        print(f"🔍 Analyzing input video properties...")
+        try:
+            probe_cmd = [
+                "ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", abs_video_path
+            ]
+            probe_result = subprocess.run(probe_cmd, capture_output=True, text=True, check=True)
+            print(f"   ✅ Video analysis completed")
+        except subprocess.CalledProcessError as e:
+            print(f"   ⚠️ Could not analyze video properties: {e}")
+        
+        # Crop each segment using FFmpeg with re-encoding
+        print(f"🎬 Processing segments with fast copy method and fallback re-encoding...")
         for i, segment in enumerate(segments):
             start = float(segment['start'])
             end = float(segment['end'])
@@ -258,51 +271,93 @@ def crop_and_stitch_video_segments(video_filepath: str, segments: List[Dict], ou
             
             print(f"✂️ Cropping segment {i+1}/{len(segments)}: {start}s - {end}s")
             
-            # Build FFmpeg command for cropping
-            ffmpeg_cmd = [
+            # Try fast method first (stream copy with keyframe seeking)
+            # Seek before input for faster processing
+            ffmpeg_cmd_fast = [
                 "ffmpeg",
+                "-ss", str(start),              # Seek before input (much faster)
                 "-i", abs_video_path,           # Input video
-                "-ss", str(start),              # Start time
                 "-t", str(duration),            # Duration
-                "-c", "copy",                   # Copy streams without re-encoding (fastest)
+                "-c", "copy",                   # Copy streams (fastest)
                 "-avoid_negative_ts", "make_zero",  # Handle timestamp issues
                 "-y",                           # Overwrite output file
                 temp_segment_path
             ]
             
-            print(f"   Command: ffmpeg -i {os.path.basename(abs_video_path)} -ss {start} -t {duration} -c copy -y {segment_filename}")
+            # Fallback method with minimal re-encoding if fast method fails
+            ffmpeg_cmd_fallback = [
+                "ffmpeg",
+                "-ss", str(start),              # Seek before input
+                "-i", abs_video_path,           # Input video
+                "-t", str(duration),            # Duration
+                "-c:v", "libx264",              # Re-encode video only if needed
+                "-c:a", "copy",                 # Copy audio (faster)
+                "-crf", "23",                   # Good quality
+                "-preset", "veryfast",          # Fast encoding
+                "-avoid_negative_ts", "make_zero",
+                "-y",
+                temp_segment_path
+            ]
             
-            # Execute FFmpeg command
+            # Try fast method first
+            print(f"   Attempting fast copy method...")
+            success = False
+            
             try:
                 result = subprocess.run(
-                    ffmpeg_cmd,
+                    ffmpeg_cmd_fast,
                     capture_output=True,
                     text=True,
                     check=True
                 )
                 
-                # Verify segment was created
-                if not os.path.exists(temp_segment_path):
-                    raise RuntimeError(f"FFmpeg completed but segment file was not created: {temp_segment_path}")
-                
-                segment_size = os.path.getsize(temp_segment_path)
-                print(f"   ✅ Segment {i+1} created: {segment_size / (1024*1024):.1f} MB")
-                temp_files.append(temp_segment_path)
-                
+                # Verify segment was created and is valid
+                if os.path.exists(temp_segment_path) and os.path.getsize(temp_segment_path) > 1000:
+                    segment_size = os.path.getsize(temp_segment_path)
+                    print(f"   ✅ Fast method: Segment {i+1} created: {segment_size / (1024*1024):.1f} MB")
+                    temp_files.append(temp_segment_path)
+                    success = True
+                else:
+                    print(f"   ⚠️ Fast method produced invalid file, trying fallback...")
+                    
             except subprocess.CalledProcessError as e:
-                error_msg = f"FFmpeg failed for segment {i+1} with exit code {e.returncode}"
-                if e.stderr:
-                    error_msg += f"\nSTDERR: {e.stderr}"
-                if e.stdout:
-                    error_msg += f"\nSTDOUT: {e.stdout}"
-                
-                print(f"❌ Segment {i+1} cropping failed: {error_msg}")
-                raise RuntimeError(f"Segment cropping failed: {error_msg}")
+                print(f"   ⚠️ Fast method failed (exit code {e.returncode}), trying fallback...")
+            
+            # If fast method failed, try fallback with minimal re-encoding
+            if not success:
+                try:
+                    print(f"   Using fallback method with minimal re-encoding...")
+                    result = subprocess.run(
+                        ffmpeg_cmd_fallback,
+                        capture_output=True,
+                        text=True,
+                        check=True
+                    )
+                    
+                    # Verify segment was created
+                    if not os.path.exists(temp_segment_path):
+                        raise RuntimeError(f"FFmpeg completed but segment file was not created: {temp_segment_path}")
+                    
+                    segment_size = os.path.getsize(temp_segment_path)
+                    print(f"   ✅ Fallback method: Segment {i+1} created: {segment_size / (1024*1024):.1f} MB")
+                    temp_files.append(temp_segment_path)
+                    
+                except subprocess.CalledProcessError as e:
+                    error_msg = f"FFmpeg failed for segment {i+1} (start: {start}s, duration: {duration}s) with exit code {e.returncode}"
+                    if e.stderr:
+                        error_msg += f"\nSTDERR: {e.stderr}"
+                    if e.stdout:
+                        error_msg += f"\nSTDOUT: {e.stdout}"
+                    
+                    print(f"❌ Segment {i+1} cropping failed: {error_msg}")
+                    print(f"   📊 Segment details: start={start}s, end={end}s, duration={duration}s")
+                    print(f"   🔧 Try checking if the video duration is sufficient for this segment")
+                    raise RuntimeError(f"Segment cropping failed: {error_msg}")
         
-        print(f"✅ All {len(segments)} segments cropped successfully")
+        print(f"✅ All {len(segments)} segments cropped successfully with optimized processing")
         
         # Stitch the cropped segments together
-        print(f"🔗 Stitching {len(temp_files)} segments together...")
+        print(f"🔗 Stitching {len(temp_files)} segments together with fast method...")
         final_output_path = stitch_videos_together(temp_files, abs_output_path)
         
         # Verify final output
@@ -403,37 +458,86 @@ def stitch_videos_together(video_file_paths: List[str], output_path: str) -> str
         # Normalize output path
         abs_output_path = os.path.abspath(output_path)
         
-        # Build FFmpeg command for concatenation
-        ffmpeg_cmd = [
+        # Build FFmpeg command for concatenation - try fast method first
+        ffmpeg_cmd_fast = [
             "ffmpeg",
             "-f", "concat",           # Use concat demuxer
             "-safe", "0",             # Allow unsafe file paths
             "-i", temp_list_path,     # Input file list
-            "-c", "copy",             # Copy streams without re-encoding (fastest)
+            "-c", "copy",             # Copy streams (fastest)
             "-y",                     # Overwrite output file
             abs_output_path
         ]
         
-        print(f"🎬 Running FFmpeg concatenation...")
-        print(f"Command: {' '.join(ffmpeg_cmd)}")
+        # Fallback with minimal re-encoding if stream copy fails
+        ffmpeg_cmd_fallback = [
+            "ffmpeg",
+            "-f", "concat",           # Use concat demuxer
+            "-safe", "0",             # Allow unsafe file paths
+            "-i", temp_list_path,     # Input file list
+            "-c:v", "libx264",        # Re-encode video only if needed
+            "-c:a", "copy",           # Copy audio (faster)
+            "-crf", "23",             # Good quality
+            "-preset", "veryfast",    # Fastest encoding
+            "-y",                     # Overwrite output file
+            abs_output_path
+        ]
         
-        # Execute FFmpeg command
-        result = subprocess.run(
-            ffmpeg_cmd,
-            capture_output=True,
-            text=True,
-            check=True
-        )
+        print(f"🎬 Trying fast concatenation with stream copy...")
+        success = False
         
-        # Check if output file was created
-        if not os.path.exists(abs_output_path):
-            raise RuntimeError("FFmpeg completed but output file was not created")
+        # Try fast method first
+        try:
+            result = subprocess.run(
+                ffmpeg_cmd_fast,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            # Verify output exists and has reasonable size
+            if os.path.exists(abs_output_path) and os.path.getsize(abs_output_path) > 1000:
+                output_size = os.path.getsize(abs_output_path)
+                print(f"✅ Fast concatenation successful!")
+                print(f"   📁 Output: {os.path.basename(abs_output_path)}")
+                print(f"   📊 Size: {output_size / (1024*1024):.1f} MB")
+                success = True
+            else:
+                print(f"⚠️ Fast method produced invalid output, trying fallback...")
+                
+        except subprocess.CalledProcessError as e:
+            print(f"⚠️ Fast concatenation failed (exit code {e.returncode}), trying fallback...")
         
-        # Get output file size for verification
-        output_size = os.path.getsize(abs_output_path)
-        print(f"✅ Video stitching completed successfully!")
-        print(f"   📁 Output: {os.path.basename(abs_output_path)}")
-        print(f"   📊 Size: {output_size / (1024*1024):.1f} MB")
+        # If fast method failed, use fallback with minimal re-encoding
+        if not success:
+            print(f"🔄 Using fallback concatenation with minimal re-encoding...")
+            try:
+                result = subprocess.run(
+                    ffmpeg_cmd_fallback,
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                
+                # Check if output file was created
+                if not os.path.exists(abs_output_path):
+                    raise RuntimeError("FFmpeg completed but output file was not created")
+                
+                # Get output file size for verification
+                output_size = os.path.getsize(abs_output_path)
+                print(f"✅ Fallback concatenation successful!")
+                print(f"   📁 Output: {os.path.basename(abs_output_path)}")
+                print(f"   📊 Size: {output_size / (1024*1024):.1f} MB")
+                
+            except subprocess.CalledProcessError as e:
+                error_msg = f"FFmpeg concatenation failed with exit code {e.returncode}"
+                if e.stderr:
+                    error_msg += f"\nSTDERR: {e.stderr}"
+                if e.stdout:
+                    error_msg += f"\nSTDOUT: {e.stdout}"
+                
+                print(f"❌ Video stitching failed: {error_msg}")
+                raise RuntimeError(f"Video stitching failed: {error_msg}")
         
         return abs_output_path
         
@@ -899,7 +1003,22 @@ def process_multi_video_pipeline(job_id: str, multi_video_job_status: Dict[str, 
 if __name__ == "__main__":
     import sys
     
-    if len(sys.argv) > 1 and sys.argv[1] == "--test-crop":
+    if len(sys.argv) > 1 and sys.argv[1] == "--test-compatibility":
+        # Test video compatibility checking
+        if len(sys.argv) > 2:
+            video_path = sys.argv[2]
+            print(f"🔍 Checking video compatibility: {video_path}")
+            info = check_video_compatibility(video_path)
+            if info:
+                print(f"✅ Video info:")
+                for key, value in info.items():
+                    print(f"   {key}: {value}")
+            else:
+                print(f"❌ Could not analyze video")
+        else:
+            print("Usage: python pipeline.py --test-compatibility <video_path>")
+    
+    elif len(sys.argv) > 1 and sys.argv[1] == "--test-crop":
         # Test video cropping and stitching
         example_timestamps = [
             {
@@ -964,8 +1083,16 @@ if __name__ == "__main__":
     else:
         print("🎬 Pipeline Test Functions")
         print("Usage:")
-        print("  python pipeline.py --test-crop    # Test video cropping and stitching")
-        print("  python pipeline.py --test-music   # Test adding background music")
+        print("  python pipeline.py --test-compatibility <video>  # Check video format compatibility")
+        print("  python pipeline.py --test-crop                   # Test video cropping and stitching")
+        print("  python pipeline.py --test-music                  # Test adding background music")
+        print("")
+        print("🔧 Recent improvements:")
+        print("  • Smart processing: Fast copy with fallback re-encoding only when needed")
+        print("  • Optimized seeking: Faster segment extraction with keyframe alignment")
+        print("  • Minimal re-encoding: Only re-encode when absolutely necessary")
+        print("  • Better error handling and video analysis")
+        print("  • Optimized for both speed and compatibility")
         print("")
         print("Make sure test files exist:")
         print("  ../videos/tom_and_jerry_trailer_no_music.mp4")
