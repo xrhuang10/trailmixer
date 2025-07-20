@@ -98,23 +98,40 @@ def process_video_pipeline(job_id: str, job_status: Dict[str, JobInfo]):
         output_path = f'../processed_videos/{job_id}_processed.mp4'
         input_segments = []
         
-        # Add original video as input segment
-        video_length = sentiment_data.get('video_length', 60)
-        video_formatted_duration = f'{int(video_length//3600):02d}:{int((video_length%3600)//60):02d}:{int(video_length%60):02d}'
-        video_segment = InputSegment(
-            file_path=file_path,
-            file_type='video',
-            start_time='00:00:00',
-            end_time=video_formatted_duration,
-            clip_start='00:00:00',
-            clip_end=video_formatted_duration,  # Set explicit clip end
-            volume=0.4,
-            fade_in=None,
-            fade_out=None,
-            metadata=None
-        )
-        input_segments.append(video_segment)
-        
+        # Parse the sentiment analysis JSON file
+        import json
+        with open(sentiment_data.get('file_path'), 'r') as f:
+            json_data = json.load(f)
+            
+        # Create video segments based on JSON segments
+        current_output_time = 0  # Track the output timeline position in seconds
+        for segment in json_data['segments']:
+            # Convert current output time to HH:MM:SS format
+            start_formatted = f'{int(current_output_time//3600):02d}:{int((current_output_time%3600)//60):02d}:{int(current_output_time%60):02d}'
+            
+            # Calculate segment duration and end time
+            segment_duration = segment['end_time'] - segment['start_time']
+            current_output_time += segment_duration
+            end_formatted = f'{int(current_output_time//3600):02d}:{int((current_output_time%3600)//60):02d}:{int(current_output_time%60):02d}'
+            
+            # Format clip times from JSON
+            clip_start = f'{int(segment["start_time"]//3600):02d}:{int((segment["start_time"]%3600)//60):02d}:{int(segment["start_time"]%60):02d}'
+            clip_end = f'{int(segment["end_time"]//3600):02d}:{int((segment["end_time"]%3600)//60):02d}:{int(segment["end_time"]%60):02d}'
+            
+            video_segment = InputSegment(
+                file_path=file_path,
+                file_type='video',
+                start_time=start_formatted,  # When this segment should start in output
+                end_time=end_formatted,      # When this segment should end in output
+                clip_start=clip_start,       # Where to start clipping from source
+                clip_end=clip_end,           # Where to end clipping from source
+                volume=0.4,
+                fade_in=None,
+                fade_out=None,
+                metadata=None
+            )
+            input_segments.append(video_segment)
+            
         # Add audio segments from music file paths
         print(f"🎵 Adding {len(music_file_paths)} audio segments...")
         for audio_file, timing_info in music_file_paths.items():
