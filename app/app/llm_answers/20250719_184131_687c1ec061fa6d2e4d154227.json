@@ -1,0 +1,28 @@
+{
+  "video_id": "12345",
+  "video_title": "Hike Between Rock Formations",
+  "video_description": "A woman in a red dress and a man walk side-by-side down a dirt path between large rock formations as the sky darkens.",
+  "video_length": 17,
+  "overall_mood": "dramatic",
+  "segments": [
+    {
+      "start_time": 0,
+      "end_time": 17,
+      "sentiment": "dramatic",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    }
+  ],
+  "music": {
+    "tracks": [
+      {
+        "start": 0,
+        "end": 60,
+        "style": "Pop",
+        "intensity": "medium",
+        "sentiment": "dramatic"
+      }
+    ]
+  }
+}

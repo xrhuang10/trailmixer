@@ -1,0 +1,28 @@
+{
+  "video_id": "1234567890",
+  "video_title": "Mystic Pathway",
+  "video_description": "A woman in a red dress walks down a dirt path between large rock formations. A man joins her, and they continue walking together.",
+  "video_length": 16,
+  "overall_mood": "romantic",
+  "segments": [
+    {
+      "start_time": 0,
+      "end_time": 16,
+      "sentiment": "romantic",
+      "music_style": "Pop",
+      "intensity": "medium",
+      "include": true
+    }
+  ],
+  "music": {
+    "tracks": [
+      {
+        "start": 0,
+        "end": 60,
+        "style": "Pop",
+        "intensity": "medium",
+        "sentiment": "romantic"
+      }
+    ]
+  }
+}
