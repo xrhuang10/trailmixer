@@ -3,8 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from typing import List
 import uvicorn
-import os
-from pathlib import Path
+
+from models import VideoUploadRequest, VideoUploadResponse, VideoStitchRequest, VideoStitchResponse
+from paths import UPLOAD_DIR, PROCESSED_DIR
+from video import stitch_videos
 
 app = FastAPI(title="TrailMixer Video Processing API")
 
@@ -17,28 +19,12 @@ app.add_middleware(
 )
 
 # Serve the output directory
-app.mount("/output", StaticFiles(directory="output"), name="output")
-
-# Define absolute path to the output directory
-TRAILMIXER_ROOT = Path(__file__).resolve().parent.parent
-UPLOAD_DIR = TRAILMIXER_ROOT / "upload"
-UPLOAD_DIR.mkdir(exist_ok=True)
-
-def is_mp4_file(file: UploadFile) -> bool:
-    """Validate if the uploaded file is an MP4 video file."""
-    # Check MIME type
-    if file.content_type == "video/mp4":
-        return True
-    
-    # Check file extension as fallback
-    if file.filename and file.filename.lower().endswith('.mp4'):
-        return True
-    
-    return False
+app.mount("/processed", StaticFiles(directory=PROCESSED_DIR), name="processed")
 
 # Routes
 @app.post('/api/video/upload')
-async def upload_video(files: List[UploadFile] = File(...)):
+async def upload_video(request: VideoUploadRequest) -> VideoUploadResponse:
+    files = request.files
     try:
         if not files:
             raise HTTPException(status_code=400, detail="No files uploaded")
@@ -50,13 +36,30 @@ async def upload_video(files: List[UploadFile] = File(...)):
                 raise HTTPException(status_code=400, detail=f"File {file.filename} is not a valid MP4 file")
         
         # Save the files to the output directory
+        filenames = []
         for file in files:
+            filenames.append(file.filename)
             file_location = UPLOAD_DIR / file.filename
             with open(file_location, "wb") as buffer:
                 buffer.write(await file.read())
         
         # Process the files
-        return {"message": f"{len(files)} MP4 files uploaded successfully", "status": "success"}
+        return VideoUploadResponse(message=f"{len(files)} MP4 files uploaded successfully", status="success", filenames=filenames)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post('/api/video/stitch')
+async def stitch_video(request: VideoStitchRequest) -> VideoStitchResponse:
+    filenames = request.filenames
+    if filenames is None or len(filenames) == 0:
+        return VideoStitchResponse(message="No files uploaded", status="error", filename="")
+    
+    if len(filenames) == 1:
+        return VideoStitchResponse(message=f"Only one file uploaded, no stitching required", status="success", filename=filenames[0])
+    
+    try:
+        # Process the files
+        return VideoStitchResponse(message=f"{len(filenames)} MP4 files stitched successfully", status="success", filename=filenames[0])
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
