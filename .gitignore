@@ -11,6 +11,7 @@ __pycache__
 .coverage.xml
 .coverage.xml.gz
 
-uploads/
 old-version/
 videos/
+upload/
+output/
