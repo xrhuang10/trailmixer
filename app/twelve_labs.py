@@ -1,5 +1,6 @@
 import os
-from typing import Optional
+import json
+from typing import List, Dict, Optional
 
 from dotenv import load_dotenv
 from twelvelabs import TwelveLabs
@@ -35,14 +36,23 @@ class TwelveLabsClient:
         else:
             raise RuntimeError(f'Twelve Labs task failed: {task.status}')
 
-    def prompt(self, video_id: str, prompt: str) -> Optional[str]:
+    def prompt_segment(self, video_id: str, prompt: str) -> Optional[List[Dict[str, float]]]: 
         print(f'Prompting Twelve Labs with video ID: {video_id}')
         response = self.client.analyze(
             video_id=video_id,
             prompt=prompt
         )
         print(f'Prompting complete! Response received.')
-        return response.data
+        if not response.data:
+            return None
+        data = json.loads(response.data)
+        
+        # Convert all second values to float
+        for segment in data:
+            segment["start"] = float(segment["start"])
+            segment["end"] = float(segment["end"])
+            
+        return data
     
 # For testing
 if __name__ == "__main__":
@@ -57,5 +67,5 @@ if __name__ == "__main__":
     # client.upload_video("videos/speed.mp4")
     
     prompt = segment_video_prompt(num_segments=2)
-    print(client.prompt(video_id="6882c933fcecfb2100e4edb3", prompt=prompt).data)
+    print(client.prompt_segment(video_id="6882c933fcecfb2100e4edb3", prompt=prompt))
     
