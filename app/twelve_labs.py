@@ -1,6 +1,7 @@
 import os
 import json
 from typing import List, Dict, Optional
+from pathlib import Path
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -17,24 +18,18 @@ class TwelveLabsClient:
         self.client = TwelveLabs(api_key=api_key)
         self.index = index
 
-    def upload_video(self, filename: str) -> str:
-        print(f'Uploading video to Twelve Labs: {filename}')
-        print(f'File path: {STITCHED_DIR / filename}')
-        
+    def upload_video(self, video_path: Path) -> str:
+        print(f'Uploading video to Twelve Labs: {video_path}')
         task = self.client.task.create(
             index_id=self.index,
-            file=str(STITCHED_DIR / filename)
+            file=str(video_path)
         )
-        
         print(f'Created Twelve Labs task: {task.id}')
-    
         self.tick = 0
         def on_task_update(task: Task):
             print(f'T{self.tick}: Twelve Labs Task Status: {task.status}')
             self.tick += 1
-        
         task.wait_for_done(callback=on_task_update)
-        
         if task.status == "ready":
             print(f'Twelve Labs task completed: {task.video_id}')
             return task.video_id
@@ -81,7 +76,7 @@ class TwelveLabsClient:
             sentiment = segment.get("sentiment", None)
             if sentiment is None:
                 raise ValueError("Sentiment is required")
-            segment["song_path"] = MUSIC_DIR / f"{music_style}/{sentiment}"
+            segment["song_path"] = MUSIC_DIR / f"{music_style}/{sentiment}.mp3"
             
         return data
     
@@ -95,9 +90,9 @@ if __name__ == "__main__":
     
     client = TwelveLabsClient(api_key=TWELVE_LABS_API_KEY, index=TWELVE_LABS_INDEX_ID)
     
-    client.upload_video("speed.mp4")
+    # client.upload_video(STITCHED_DIR / "speed.mp4")
     
     # prompt = segment_video_prompt(num_segments=2)
     # prompt = sentiment_analysis_prompt(num_sentiments=2)
-    print(client.prompt_segment(video_id="6882c933fcecfb2100e4edb3", desired_duration=10, num_segments=2))
+    print(client.prompt_segment(video_id="6883e11cb59be315a5bcff45", desired_duration=30, num_segments=5))
     

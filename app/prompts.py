@@ -1,9 +1,14 @@
-def segment_video_prompt(num_segments: int, desired_duration: int) -> str:
+def segment_video_prompt(num_segments: int, desired_duration: float) -> str:
     prompt = f"""
-    You are a professional video editor. Your task is to take this video, and split it strictly into the top {num_segments} most important parts. 
-    The desired duration of each segment is {desired_duration} seconds.
-    Essentially you are going to be creating a list of timestamps for each segment. Output the timestamps strictly in a JSON format.
-    The JSON should be in the following exampleformat:
+    You are a professional video editor. Your task is to split this video into the top {num_segments} most important segments, with a combined total duration as close as possible to {desired_duration} seconds, but not exceeding it.
+
+    Instructions:
+    - Each segment should be represented by a start and end time in seconds (with milliseconds).
+    - The end time of the last segment must not exceed the video's total duration.
+    - The sum of all segment durations (end - start for each) should be as close as possible to {desired_duration} seconds, but never exceed it.
+    - Segments should not overlap and should be ordered chronologically.
+    - Output strictly in the following JSON format (no extra text):
+
     [
         {{
             "start": "0.0",
@@ -11,13 +16,12 @@ def segment_video_prompt(num_segments: int, desired_duration: int) -> str:
         }},
         {{
             "start": "10.0",
-            "end": "20"
+            "end": "20.0"
         }}
     ]
-    The start and end should be in seconds with milliseconds.
+
     Do not include any other text in your response.
     """
-    
     return prompt
 
 def sentiment_analysis_prompt(num_sentiments: int) -> str:

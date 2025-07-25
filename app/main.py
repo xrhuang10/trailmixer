@@ -5,10 +5,11 @@ from typing import List
 import uvicorn
 import os
 import shutil
+from pathlib import Path
 
-from models import VideoUploadRequest, VideoUploadResponse, VideoStitchRequest, VideoStitchResponse, VideoProcessRequest, VideoProcessResponse
+from models import VideoUploadResponse, VideoStitchRequest, VideoStitchResponse, VideoProcessRequest, VideoProcessResponse
 from twelve_labs import TwelveLabsClient
-from paths import UPLOAD_DIR, PROCESSED_DIR, STITCHED_DIR
+from paths import UPLOAD_DIR, PROCESSED_DIR, STITCHED_DIR, CROPPED_DIR, VIDEOS_DIR
 from video import stitch_videos, crop_video, apply_music
 
 app = FastAPI(title="TrailMixer Video Processing API")
@@ -48,27 +49,19 @@ async def upload_video(files: List[UploadFile] = File(...)) -> VideoUploadRespon
 @app.post('/api/video/stitch')
 async def stitch_video(request: VideoStitchRequest) -> VideoStitchResponse:
     filenames = request.filenames
-    
     if len(filenames) == 1:
-        # Move the single file to the stitched directory
         source_file = UPLOAD_DIR / filenames[0]
         dest_file = STITCHED_DIR / filenames[0]
-        
-        # Ensure the stitched directory exists
         STITCHED_DIR.mkdir(exist_ok=True)
-        
-        # Move the file
         shutil.move(str(source_file), str(dest_file))
-        
         return VideoStitchResponse(message=f"Single file moved to stitched directory", status="success", filename=filenames[0])
-    
     try:
-        # Process the files
-        stitched_filename = stitch_videos(filenames)
-        return VideoStitchResponse(message=f"{len(filenames)} MP4 files stitched successfully", status="success", filename=stitched_filename)
+        file_paths = [UPLOAD_DIR / fname for fname in filenames]
+        stitched_path = stitch_videos(file_paths)
+        return VideoStitchResponse(message=f"{len(filenames)} MP4 files stitched successfully", status="success", filename=stitched_path.name)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
 @app.get('/api/video/process')
 async def process_video(request: VideoProcessRequest) -> VideoProcessResponse:
     filename = request.filename
@@ -76,11 +69,12 @@ async def process_video(request: VideoProcessRequest) -> VideoProcessResponse:
     num_sentiments = request.num_sentiments
     num_segments = request.num_segments
     desired_duration = request.desired_duration
+    
     if filename is None:
         return VideoProcessResponse(message="No filename provided", status="error", filename="")
     
     try:
-        # Twelve Labs environment variables
+        # Initialize the Twelve Labs client
         TWELVE_LABS_API_KEY = os.getenv("TWELVE_LABS_API_KEY")
         TWELVE_LABS_INDEX_ID = os.getenv("TWELVE_LABS_INDEX_ID")
         if not TWELVE_LABS_API_KEY:
@@ -88,28 +82,34 @@ async def process_video(request: VideoProcessRequest) -> VideoProcessResponse:
         if not TWELVE_LABS_INDEX_ID:
             raise HTTPException(status_code=500, detail="TWELVE_LABS_INDEX_ID must be set")
         
-        # Initialize the Twelve Labs client
         twelve_labs_client = TwelveLabsClient(api_key=TWELVE_LABS_API_KEY, index=TWELVE_LABS_INDEX_ID)
-                
-        # Get the video id
-        video_id = twelve_labs_client.upload_video(filename)
+        
+        # Upload the original video for segmentation
+        video_path = STITCHED_DIR / filename
+        # video_id = twelve_labs_client.upload_video(video_path)
         
         # Get the video segments
+        video_id = '6883e11cb59be315a5bcff45'
         segments = twelve_labs_client.prompt_segment(video_id, desired_duration=desired_duration, num_segments=num_segments)
         
         # Crop the video
-        cropped_video = crop_video(filename, segments)
+        cropped_path = crop_video(video_path, segments, 'cropped.mp4')
         
-        # Get the sentiment of the video
-        sentiment_segments = twelve_labs_client.prompt_sentiment(video_id, num_sentiments=num_sentiments, music_style=music_style)
+        # Upload the cropped video for sentiment analysis
+        cropped_video_id = twelve_labs_client.upload_video(cropped_path)
+        
+        # Get the sentiment of the cropped video
+        sentiment_segments = twelve_labs_client.prompt_sentiment(cropped_video_id, num_sentiments=num_sentiments, music_style=music_style)
         
         # Apply the music
-        processed_video = apply_music(cropped_video, sentiment_segments, 'processed.mp4')
+        processed_path = apply_music(cropped_path, sentiment_segments)
         
         # Return the processed video
-        return VideoProcessResponse(message="Video processed successfully", status="success", filename=processed_video)
+        return VideoProcessResponse(message="Video processed successfully", status="success", filename=processed_path.name)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="debug")
+    # import asyncio
+    # asyncio.run(process_video(VideoProcessRequest(filename=str(VIDEOS_DIR / "tom_and_jerry_trailer_no_music.mp4"), music_style="meme", num_sentiments=1, num_segments=2, desired_duration=15)))
