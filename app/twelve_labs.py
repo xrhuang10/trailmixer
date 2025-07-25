@@ -3,8 +3,9 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from twelvelabs import TwelveLabs
-from twelvelabs.models import GenerateOpenEndedTextResult
 from twelvelabs.models.task import Task
+
+from prompts import segment_video_prompt
 
 class TwelveLabsClient:
     def __init__(self, api_key, index):
@@ -34,14 +35,14 @@ class TwelveLabsClient:
         else:
             raise RuntimeError(f'Twelve Labs task failed: {task.status}')
 
-    def prompt(self, video_id: str, prompt: str) -> Optional[GenerateOpenEndedTextResult]:
+    def prompt(self, video_id: str, prompt: str) -> Optional[str]:
         print(f'Prompting Twelve Labs with video ID: {video_id}')
         response = self.client.analyze(
             video_id=video_id,
             prompt=prompt
         )
         print(f'Prompting complete! Response received.')
-        return response
+        return response.data
     
 # For testing
 if __name__ == "__main__":
@@ -52,4 +53,9 @@ if __name__ == "__main__":
         raise ValueError("TWELVE_LABS_API_KEY and TWELVE_LABS_INDEX_ID must be set")
     
     client = TwelveLabsClient(api_key=TWELVE_LABS_API_KEY, index=TWELVE_LABS_INDEX_ID)
-    client.upload_video("videos/speed.mp4")
+    
+    # client.upload_video("videos/speed.mp4")
+    
+    prompt = segment_video_prompt(num_segments=2)
+    print(client.prompt(video_id="6882c933fcecfb2100e4edb3", prompt=prompt).data)
+    
