@@ -15,3 +15,5 @@ old-version/
 videos/
 upload/
 output/
+processed/
+preprocessed/

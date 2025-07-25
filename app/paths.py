@@ -15,5 +15,11 @@ VIDEOS_DIR.mkdir(exist_ok=True)
 MUSIC_DIR = TRAILMIXER_ROOT / "music"
 MUSIC_DIR.mkdir(exist_ok=True)
 
-PREPROCESSED_DIR = TRAILMIXER_ROOT / "preprocessed"
-PREPROCESSED_DIR.mkdir(exist_ok=True)
+STITCHED_DIR = TRAILMIXER_ROOT / "stitched"
+STITCHED_DIR.mkdir(exist_ok=True)
+
+TEMP_DIR = TRAILMIXER_ROOT / "temp"
+TEMP_DIR.mkdir(exist_ok=True)
+
+CROPPED_DIR = TRAILMIXER_ROOT / "cropped"
+CROPPED_DIR.mkdir(exist_ok=True)

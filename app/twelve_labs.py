@@ -3,10 +3,12 @@ import json
 from typing import List, Dict, Optional
 
 from dotenv import load_dotenv
+load_dotenv()
 from twelvelabs import TwelveLabs
 from twelvelabs.models.task import Task
 
-from prompts import segment_video_prompt
+from prompts import segment_video_prompt, sentiment_analysis_prompt
+from paths import MUSIC_DIR, STITCHED_DIR
 
 class TwelveLabsClient:
     def __init__(self, api_key, index):
@@ -15,10 +17,13 @@ class TwelveLabsClient:
         self.client = TwelveLabs(api_key=api_key)
         self.index = index
 
-    def upload_video(self, file_path: str) -> str:
+    def upload_video(self, filename: str) -> str:
+        print(f'Uploading video to Twelve Labs: {filename}')
+        print(f'File path: {STITCHED_DIR / filename}')
+        
         task = self.client.task.create(
             index_id=self.index,
-            file=file_path
+            file=str(STITCHED_DIR / filename)
         )
         
         print(f'Created Twelve Labs task: {task.id}')
@@ -36,8 +41,9 @@ class TwelveLabsClient:
         else:
             raise RuntimeError(f'Twelve Labs task failed: {task.status}')
 
-    def prompt_segment(self, video_id: str, prompt: str) -> Optional[List[Dict[str, float]]]: 
-        print(f'Prompting Twelve Labs with video ID: {video_id}')
+    def prompt_segment(self, video_id: str, desired_duration: int, num_segments: int) -> Optional[List[Dict[str, float]]]: 
+        print(f'Segmentation prompt Twelve Labs with video ID: {video_id}')
+        prompt = segment_video_prompt(desired_duration=desired_duration, num_segments=num_segments)
         response = self.client.analyze(
             video_id=video_id,
             prompt=prompt
@@ -54,6 +60,31 @@ class TwelveLabsClient:
             
         return data
     
+    def prompt_sentiment(self, video_id: str, num_sentiments: int, music_style: str) -> Optional[List[Dict[str, float]]]: 
+        print(f'Sentiment analysis prompt Twelve Labs with video ID: {video_id}')
+        prompt = sentiment_analysis_prompt(num_sentiments=num_sentiments)
+        response = self.client.analyze(
+            video_id=video_id,
+            prompt=prompt
+        )
+        print(f'Prompting complete! Response received.')
+        if not response.data:
+            return None
+        data = json.loads(response.data)
+        
+        # Convert all second values to float and add song paths
+        for segment in data:
+            segment["start"] = float(segment["start"])
+            segment["end"] = float(segment["end"])
+            
+            # Add song path based on music_style and sentiment
+            sentiment = segment.get("sentiment", None)
+            if sentiment is None:
+                raise ValueError("Sentiment is required")
+            segment["song_path"] = MUSIC_DIR / f"{music_style}/{sentiment}"
+            
+        return data
+    
 # For testing
 if __name__ == "__main__":
     load_dotenv()
@@ -64,8 +95,9 @@ if __name__ == "__main__":
     
     client = TwelveLabsClient(api_key=TWELVE_LABS_API_KEY, index=TWELVE_LABS_INDEX_ID)
     
-    # client.upload_video("videos/speed.mp4")
+    client.upload_video("speed.mp4")
     
-    prompt = segment_video_prompt(num_segments=2)
-    print(client.prompt_segment(video_id="6882c933fcecfb2100e4edb3", prompt=prompt))
+    # prompt = segment_video_prompt(num_segments=2)
+    # prompt = sentiment_analysis_prompt(num_sentiments=2)
+    print(client.prompt_segment(video_id="6882c933fcecfb2100e4edb3", desired_duration=10, num_segments=2))
     
