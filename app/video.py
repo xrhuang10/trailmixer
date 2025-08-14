@@ -19,6 +19,18 @@ def stitch_videos(filepaths: list[Path], output_filename: str = None) -> Path:
     except Exception as e:
         raise Exception(f"Error stitching videos: {e}")
 
+def sanitize_segments(segments, video_duration: float):
+    """Clamp to [0, duration], drop invalid ranges, and sort."""
+    cleaned = []
+    for seg in segments:
+        start = max(0.0, min(float(seg["start"]), video_duration))
+        end   = max(0.0, min(float(seg["end"]),   video_duration))
+        if end > start:  # keep only positive-length segments
+            cleaned.append({"start": start, "end": end})
+    cleaned.sort(key=lambda s: s["start"])
+    return cleaned
+
+
 def crop_video(input_path: Path, segments: List[dict], output_filename: str = None) -> Path:
     """
     Crops a video into segments and stitches them back together.
@@ -32,7 +44,14 @@ def crop_video(input_path: Path, segments: List[dict], output_filename: str = No
     temp_clips = []
     try:
         with VideoFileClip(str(input_path)) as video:
-            for segment in segments:
+            duration = float(video.duration)
+            safe_segments = sanitize_segments(segments, duration)
+            if not safe_segments:
+                raise ValueError(
+                    f"No valid segments within duration={duration:.2f}s. Raw={segments!r}"
+                )
+
+            for segment in safe_segments:
                 start = float(segment['start'])
                 end = float(segment['end'])
                 clip = video.subclipped(start, end)

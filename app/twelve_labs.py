@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 load_dotenv()
 from twelvelabs import TwelveLabs
 from twelvelabs.models.task import Task
+from utils import _to_seconds
+
 
 from prompts import segment_video_prompt, sentiment_analysis_prompt
 from paths import MUSIC_DIR, STITCHED_DIR
@@ -50,9 +52,10 @@ class TwelveLabsClient:
         
         # Convert all second values to float
         for segment in data:
-            segment["start"] = float(segment["start"])
-            segment["end"] = float(segment["end"])
-            
+            segment["start"] = _to_seconds(segment["start"])
+            segment["end"] = _to_seconds(segment["end"])
+
+        print("passed")
         return data
     
     def prompt_sentiment(self, video_id: str, num_sentiments: int, music_style: str) -> Optional[List[Dict[str, float]]]: 

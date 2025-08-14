@@ -62,7 +62,7 @@ async def stitch_video(request: VideoStitchRequest) -> VideoStitchResponse:
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get('/api/video/process')
+@app.post('/api/video/process')
 async def process_video(request: VideoProcessRequest) -> VideoProcessResponse:
     filename = request.filename
     music_style = request.music_style
@@ -86,10 +86,9 @@ async def process_video(request: VideoProcessRequest) -> VideoProcessResponse:
         
         # Upload the original video for segmentation
         video_path = STITCHED_DIR / filename
-        # video_id = twelve_labs_client.upload_video(video_path)
+        video_id = twelve_labs_client.upload_video(video_path)
         
         # Get the video segments
-        video_id = '6883e11cb59be315a5bcff45'
         segments = twelve_labs_client.prompt_segment(video_id, desired_duration=desired_duration, num_segments=num_segments)
         
         # Crop the video
